@@ -23,3 +23,9 @@ go.work.sum
 
 # env file
 .env
+
+# Ignore JetBrains GoLand
+.idea
+
+# Ignore running data
+data
