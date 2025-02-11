@@ -1,14 +1,21 @@
 package deepbot
 
-// textToArgs splits a text into individual argument strings,
+// textToArgN splits a text into individual argument strings,
 // following the Windows conventions documented at
 // http://daviddeley.com/autohotkey/parameters/parameters.htm#WINARGV
-func textToArgs(text string) []string {
+func textToArgN(text string, n int) []string {
+	if n < 1 {
+		panic("invalid n in textToArgN")
+	}
 	var args []string
 	for len(text) > 0 {
 		if text[0] == ' ' || text[0] == '\t' {
 			text = text[1:]
 			continue
+		}
+		if len(args) == n-1 {
+			args = append(args, text)
+			break
 		}
 		var arg []byte
 		arg, text = readNextArg(text)
