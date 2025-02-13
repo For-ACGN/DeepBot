@@ -144,7 +144,8 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 		}
 		resp, err = chat(bot.client, req)
 	default:
-		log.Println("[error] get invalid model")
+		replyMessage(ctx, "非法模型名称")
+		return
 	}
 	if err != nil {
 		log.Printf("%s, failed to send deepseek request: %s\n", resp, err)
@@ -161,11 +162,14 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 }
 
 func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
-	msg := ctx.MessageString()
-	msg = strings.Replace(msg, "bot.设置模型 ", "", 1)
+	msg := textToArgN(ctx.MessageString(), 2)
+	if len(msg) != 2 {
+		replyMessage(ctx, "非法参数格式")
+		return
+	}
 
-	var model string
-	switch msg {
+	model := msg[1]
+	switch model {
 	case "r1":
 		model = deepseek.DeepSeekReasoner
 	case "chat":
