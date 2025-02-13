@@ -62,15 +62,12 @@ func (bot *DeepBot) onCurCharacter(ctx *zero.Ctx) {
 func (bot *DeepBot) onGetCharacter(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
-	msg := ctx.MessageString()
-	msg = strings.Replace(msg, "bot.查看人设 ", "", 1)
-
-	section := strings.Split(msg, " ")
-	if len(section) < 1 {
+	msg := textToArgN(ctx.MessageString(), 2)
+	if len(msg) != 2 {
 		replyMessage(ctx, "非法参数格式")
 		return
 	}
-	name := section[0]
+	name := msg[1]
 	if name == " " || name == "" {
 		replyMessage(ctx, "非法参数格式")
 		return
@@ -109,15 +106,12 @@ func (bot *DeepBot) onClrCharacter(ctx *zero.Ctx) {
 func (bot *DeepBot) onSetCharacter(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
-	msg := ctx.MessageString()
-	msg = strings.Replace(msg, "bot.选择人设 ", "", 1)
-
-	section := strings.Split(msg, " ")
-	if len(section) < 1 {
+	msg := textToArgN(ctx.MessageString(), 2)
+	if len(msg) != 2 {
 		replyMessage(ctx, "非法参数格式")
 		return
 	}
-	name := section[0]
+	name := msg[1]
 	if name == " " || name == "" {
 		replyMessage(ctx, "非法参数格式")
 		return
@@ -144,16 +138,21 @@ func (bot *DeepBot) onSetCharacter(ctx *zero.Ctx) {
 func (bot *DeepBot) onAddCharacter(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
-	msg := ctx.MessageString()
-	msg = strings.Replace(msg, "bot.添加人设 ", "", 1)
-
-	section := strings.SplitN(msg, " ", 2)
-	if len(section) != 2 {
+	msg := textToArgN(ctx.MessageString(), 3)
+	if len(msg) != 3 {
 		replyMessage(ctx, "非法参数格式")
 		return
 	}
-	name := section[0]
-	content := section[1]
+	name := msg[1]
+	if name == " " || name == "" {
+		replyMessage(ctx, "非法参数格式")
+		return
+	}
+	content := msg[2]
+	if content == " " || content == "" {
+		replyMessage(ctx, "人设内容为空")
+		return
+	}
 
 	file := fmt.Sprintf("data/characters/%d/%s.txt", user.id, name)
 	err := os.WriteFile(file, []byte(content), 0644)
@@ -168,15 +167,16 @@ func (bot *DeepBot) onAddCharacter(ctx *zero.Ctx) {
 func (bot *DeepBot) onDelCharacter(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
-	msg := ctx.MessageString()
-	msg = strings.Replace(msg, "bot.删除人设 ", "", 1)
-
-	section := strings.Split(msg, " ")
-	if len(section) < 1 {
+	msg := textToArgN(ctx.MessageString(), 2)
+	if len(msg) != 2 {
 		replyMessage(ctx, "非法参数格式")
 		return
 	}
-	name := section[0]
+	name := msg[1]
+	if name == " " || name == "" {
+		replyMessage(ctx, "非法参数格式")
+		return
+	}
 
 	file := fmt.Sprintf("data/characters/%d/%s.txt", user.id, name)
 	err := os.Remove(file)
@@ -192,10 +192,6 @@ func (bot *DeepBot) onDelCharacter(ctx *zero.Ctx) {
 		return
 	}
 	if string(char) == name {
-
-		fmt.Println(name)
-		fmt.Println(string(char))
-
 		err = os.WriteFile(file, nil, 0644)
 		if err != nil {
 			log.Printf("failed to update character config: %s\n", err)
