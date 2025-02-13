@@ -19,4 +19,11 @@ func TestTextToArgN(t *testing.T) {
 		require.Equal(t, "角色", args[1])
 		require.Equal(t, "人设内容 人设内容尾部", args[2])
 	})
+
+	t.Run("not enough args", func(t *testing.T) {
+		args := textToArgN("deep.选择人设 角色", 3)
+		require.Len(t, args, 2)
+		require.Equal(t, "deep.选择人设", args[0])
+		require.Equal(t, "角色", args[1])
+	})
 }
