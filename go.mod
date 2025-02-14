@@ -6,6 +6,7 @@ toolchain go1.23.4
 
 require (
 	github.com/cohesion-org/deepseek-go v1.2.0
+	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/stretchr/testify v1.10.0
 	github.com/wdvxdr1123/ZeroBot v1.8.0
 )
