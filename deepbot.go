@@ -2,43 +2,68 @@ package deepbot
 
 import (
 	"sync"
+	"time"
 
 	"github.com/cohesion-org/deepseek-go"
 	"github.com/wdvxdr1123/ZeroBot"
+	"github.com/wdvxdr1123/ZeroBot/driver"
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
 
 type Config struct {
-	APIKey  string
-	BaseURL string
-	BotCfg  *zero.Config
-	GroupID []int64
+	GroupID []int64 `toml:"group_id"`
+
+	DeepSeek struct {
+		APIKey  string `toml:"api_key"`
+		BaseURL string `toml:"base_url"`
+		Timeout int    `toml:"timeout"`
+	} `toml:"deepseek"`
+
+	OneBot struct {
+		WSClient struct {
+			Enabled bool   `toml:"enabled"`
+			URL     string `toml:"url"`
+			Token   string `toml:"token"`
+		} `toml:"ws_client"`
+
+		WSServer struct {
+			Enabled bool   `toml:"enabled"`
+			URL     string `toml:"url"`
+			Token   string `toml:"token"`
+		} `toml:"ws_server"`
+	} `toml:"onebot"`
 }
 
 type DeepBot struct {
-	config *zero.Config
+	config *Config
 	client *deepseek.Client
 
 	users   map[int64]*user
 	usersMu sync.Mutex
 }
 
-func NewDeepBot(cfg *Config) *DeepBot {
-	client := deepseek.NewClient(cfg.APIKey)
-	if cfg.BaseURL != "" {
-		client.BaseURL = cfg.BaseURL
+func NewDeepBot(config *Config) *DeepBot {
+	client := deepseek.NewClient(config.DeepSeek.APIKey)
+	baseURL := config.DeepSeek.BaseURL
+	if baseURL != "" {
+		client.BaseURL = baseURL
+	}
+	timeout := config.DeepSeek.Timeout
+	if timeout != 0 {
+		client.Timeout = time.Duration(timeout) * time.Millisecond
 	}
 	bot := DeepBot{
-		config: cfg.BotCfg,
+		config: config,
 		client: client,
 		users:  make(map[int64]*user),
 	}
+	groupID := config.GroupID
 	filter := func(ctx *zero.Ctx) bool {
 		if ctx.Event.GroupID == 0 {
 			return true
 		}
-		for i := 0; i < len(cfg.GroupID); i++ {
-			if ctx.Event.GroupID == cfg.GroupID[i] {
+		for i := 0; i < len(groupID); i++ {
+			if ctx.Event.GroupID == groupID[i] {
 				return true
 			}
 		}
@@ -61,6 +86,24 @@ func NewDeepBot(cfg *Config) *DeepBot {
 	zero.OnCommand("deep.help", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnMessage(filter).SetBlock(true).Handle(bot.onMessage)
 	return &bot
+}
+
+func (bot *DeepBot) Run() {
+	var drivers []zero.Driver
+	onebot := bot.config.OneBot
+	client := onebot.WSClient
+	if client.Enabled {
+		drivers = append(drivers, driver.NewWebSocketClient(client.URL, client.Token))
+	}
+	server := onebot.WSServer
+	if server.Enabled {
+		drivers = append(drivers, driver.NewWebSocketServer(1, server.URL, server.Token))
+	}
+	cfg := zero.Config{
+		NickName: []string{"deepbot"},
+		Driver:   drivers,
+	}
+	zero.RunAndBlock(&cfg, nil)
 }
 
 func (bot *DeepBot) getUser(uid int64) *user {
@@ -105,8 +148,4 @@ func replyMessage(ctx *zero.Ctx, msg string) {
 	// array = append(array, message.Text(" "+msg))
 	// ctx.Send(array)
 	ctx.Send(message.Text(msg))
-}
-
-func (bot *DeepBot) Run() {
-	zero.RunAndBlock(bot.config, nil)
 }
