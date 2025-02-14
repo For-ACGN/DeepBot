@@ -77,6 +77,7 @@ func (bot *DeepBot) onGetCharacter(ctx *zero.Ctx) {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		log.Printf("failed to read character file: %s\n", err)
+		replyMessage(ctx, "人设不存在")
 		return
 	}
 
@@ -121,6 +122,7 @@ func (bot *DeepBot) onSetCharacter(ctx *zero.Ctx) {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		log.Printf("failed to read character file: %s\n", err)
+		replyMessage(ctx, "人设不存在")
 		return
 	}
 	file = fmt.Sprintf("data/characters/%d/current.cfg", user.id)
@@ -148,6 +150,11 @@ func (bot *DeepBot) onAddCharacter(ctx *zero.Ctx) {
 		replyMessage(ctx, "非法参数格式")
 		return
 	}
+	if len(name) > 30 {
+		replyMessage(ctx, "人设名称太长")
+		return
+	}
+
 	content := msg[2]
 	if content == " " || content == "" {
 		replyMessage(ctx, "人设内容为空")
@@ -182,6 +189,7 @@ func (bot *DeepBot) onDelCharacter(ctx *zero.Ctx) {
 	err := os.Remove(file)
 	if err != nil {
 		log.Printf("failed to remove character file: %s\n", err)
+		replyMessage(ctx, "人设不存在")
 		return
 	}
 
