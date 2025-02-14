@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
@@ -20,8 +21,11 @@ func main() {
 	data, err := os.ReadFile(cfgPath)
 	checkError(err)
 
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+
 	var config deepbot.Config
-	err = toml.Unmarshal(data, &config)
+	err = decoder.Decode(&config)
 	checkError(err)
 
 	bot := deepbot.NewDeepBot(&config)
