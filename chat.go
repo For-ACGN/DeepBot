@@ -108,6 +108,13 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 	replyMessage(ctx, resp)
 }
 
+func (bot *DeepBot) onGetModel(ctx *zero.Ctx) {
+	user := bot.getUser(ctx.Event.UserID)
+	model := user.getModel()
+
+	replyMessage(ctx, "当前模型: "+model)
+}
+
 func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
 	msg := textToArgN(ctx.MessageString(), 2)
 	if len(msg) != 2 {
