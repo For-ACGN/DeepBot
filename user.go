@@ -11,8 +11,8 @@ import (
 )
 
 type round struct {
-	Question string
-	Answer   string
+	Question ChatMessage
+	Answer   ChatMessage
 }
 
 type user struct {
@@ -34,7 +34,7 @@ func newUser(id int64) *user {
 	user := &user{
 		id:    id,
 		last:  time.Now(),
-		model: deepseek.DeepSeekChat, // TODO replace to r1 after deepseek server stable
+		model: deepseek.DeepSeekChat,
 	}
 	err := user.initDir()
 	if err != nil {

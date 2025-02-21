@@ -11,6 +11,10 @@ import (
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
 
+type ChatRequest = deepseek.ChatCompletionRequest
+type ChatResponse = deepseek.ChatCompletionResponse
+type ChatMessage = deepseek.ChatCompletionMessage
+
 type Config struct {
 	GroupID []int64 `toml:"group_id"`
 

@@ -20,7 +20,7 @@ func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 	fmt.Println("chat", ctx.Event.GroupID, msg)
 	user := bot.getUser(ctx.Event.UserID)
 
-	req := &deepseek.ChatCompletionRequest{
+	req := &ChatRequest{
 		Model:       deepseek.DeepSeekChat,
 		Temperature: 1.3,
 		MaxTokens:   8192,
@@ -41,7 +41,7 @@ func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
 	fmt.Println("coder", ctx.Event.GroupID, msg)
 	user := bot.getUser(ctx.Event.UserID)
 
-	req := &deepseek.ChatCompletionRequest{
+	req := &ChatRequest{
 		Model:       deepseek.DeepSeekCoder,
 		Temperature: 0,
 		MaxTokens:   8192,
@@ -61,7 +61,7 @@ func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
 	fmt.Println("ai", ctx.Event.GroupID, msg)
 	user := bot.getUser(ctx.Event.UserID)
 
-	req := &deepseek.ChatCompletionRequest{
+	req := &ChatRequest{
 		Model:       deepseek.DeepSeekReasoner,
 		Temperature: 1.2,
 		MaxTokens:   8192,
@@ -81,20 +81,19 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 	}
 	msg := ctx.MessageString()
 	user := bot.getUser(ctx.Event.UserID)
+	model := user.getModel()
 
-	req := &deepseek.ChatCompletionRequest{
+	req := &ChatRequest{
 		MaxTokens: 8192,
+		Model:     model,
 	}
-	switch user.getModel() {
+	switch model {
 	case deepseek.DeepSeekChat:
-		req.Model = deepseek.DeepSeekChat
 		req.Temperature = 1.3
 		req.Tools = bot.tools
 	case deepseek.DeepSeekCoder:
-		req.Model = deepseek.DeepSeekCoder
 		req.Temperature = 0
 	case deepseek.DeepSeekReasoner:
-		req.Model = deepseek.DeepSeekCoder
 		req.Temperature = 1.2
 	default:
 		replyMessage(ctx, "非法模型名称")
@@ -144,12 +143,12 @@ func (bot *DeepBot) onReset(ctx *zero.Ctx) {
 	replyMessage(ctx, "重置会话成功")
 }
 
-func (bot *DeepBot) chat(req *deepseek.ChatCompletionRequest, user *user, msg string) (string, error) {
-	var messages []deepseek.ChatCompletionMessage
+func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, error) {
+	var messages []ChatMessage
 	// append system prompt
 	character := user.getCharacter()
 	if character != "" {
-		messages = append(messages, deepseek.ChatCompletionMessage{
+		messages = append(messages, ChatMessage{
 			Role:    constants.ChatMessageRoleSystem,
 			Content: character,
 		})
@@ -161,7 +160,7 @@ func (bot *DeepBot) chat(req *deepseek.ChatCompletionRequest, user *user, msg st
 		messages = append(messages, rounds[i].Answer)
 	}
 	// append user question
-	question := deepseek.ChatCompletionMessage{
+	question := ChatMessage{
 		Role:    constants.ChatMessageRoleUser,
 		Content: msg,
 	}
@@ -172,10 +171,10 @@ func (bot *DeepBot) chat(req *deepseek.ChatCompletionRequest, user *user, msg st
 	if err != nil {
 		return "", fmt.Errorf("failed to create chat completion: %s", err)
 	}
-	// err = processToolCall(client, req, resp)
-	// if err != nil {
-	// 	return "", fmt.Errorf("failed to process tool call: %s", err)
-	// }
+	err = bot.doToolCall(req, resp)
+	if err != nil {
+		return "", fmt.Errorf("failed to process tool call: %s", err)
+	}
 	cm := resp.Choices[0].Message
 	if cm.Role != constants.ChatMessageRoleAssistant {
 		return "", errors.New("invalid response role: " + cm.Role)
@@ -184,7 +183,7 @@ func (bot *DeepBot) chat(req *deepseek.ChatCompletionRequest, user *user, msg st
 	if response == "" {
 		return "", errors.New("receive empty response")
 	}
-	answer := deepseek.ChatCompletionMessage{
+	answer := ChatMessage{
 		Role:    constants.ChatMessageRoleAssistant,
 		Content: response,
 	}
@@ -196,10 +195,9 @@ func (bot *DeepBot) chat(req *deepseek.ChatCompletionRequest, user *user, msg st
 	return response, nil
 }
 
-func processToolCall(client *deepseek.Client, request *deepseek.ChatCompletionRequest, resp *deepseek.ChatCompletionResponse) error {
+func (bot *DeepBot) doToolCall(req *ChatRequest, resp *ChatResponse) error {
 	toolCalls := resp.Choices[0].Message.ToolCalls
 	if len(toolCalls) == 0 {
-
 		fmt.Println("debug: exit processToolCall")
 		return nil
 	}
@@ -211,8 +209,8 @@ func processToolCall(client *deepseek.Client, request *deepseek.ChatCompletionRe
 	fmt.Println(msg.Role)
 	fmt.Println(msg.Content)
 
-	newMsg := request.Messages
-	newMsg = append(newMsg, deepseek.ChatCompletionMessage{
+	newMsg := req.Messages
+	newMsg = append(newMsg, ChatMessage{
 		Role:       msg.Role,
 		Content:    msg.Content,
 		ToolCallID: tc.ID,
@@ -249,24 +247,24 @@ func processToolCall(client *deepseek.Client, request *deepseek.ChatCompletionRe
 	result = onEvalGo(args.Src)
 	fmt.Println("onEvalGo result:", result)
 
-	newMsg = append(newMsg, deepseek.ChatCompletionMessage{
+	newMsg = append(newMsg, ChatMessage{
 		Role:       "tool",
 		Content:    result,
 		ToolCallID: tc.ID,
 	})
 
-	toolReq := &deepseek.ChatCompletionRequest{
+	toolReq := &ChatRequest{
 		Model:       deepseek.DeepSeekChat,
 		Messages:    newMsg,
 		Temperature: 1.3,
 		MaxTokens:   8192,
 		Tools:       defaultTools,
 	}
-	resp, err = client.CreateChatCompletion(context.Background(), toolReq)
+	resp, err = bot.client.CreateChatCompletion(context.Background(), toolReq)
 	if err != nil {
 		return err
 	}
-	return processToolCall(client, toolReq, resp)
+	return bot.doToolCall(toolReq, resp)
 }
 
 func chatStream(client *deepseek.Client, request *deepseek.StreamChatCompletionRequest) (string, error) {
