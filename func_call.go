@@ -30,9 +30,9 @@ var toolEvalGo = deepseek.Tool{
 	Function: deepseek.Function{
 		Name: "EvalGo",
 		Description: "传入Go语言的源码，返回该程序运行时产生的输出，" +
-			"如果模型需要借助外部程序，可以调用这个函数，" +
+			"如果模型需要借助外部程序，可以调用这个函数。" +
 			"注意，请将参数放入源码中，这个函数只有一个参数用来接收源码，" +
-			"如果源码有问题，将会返回以\"Go Error: \"开头的错误信息，否则返回程序的输出。",
+			"如果运行有问题，将会返回以\"Go Error: \"开头的错误信息，否则正常返回程序的输出。",
 		Parameters: &deepseek.FunctionParameters{
 			Type: "object",
 			Properties: map[string]interface{}{
@@ -52,7 +52,7 @@ func onGetTime() string {
 
 func onEvalGo(src string) string {
 	stdin := bytes.NewReader(nil)
-	output := bytes.NewBuffer(make([]byte, 0, 1024))
+	output := bytes.NewBuffer(make([]byte, 0, 4096))
 	opts := interp.Options{
 		Stdin:  stdin,
 		Stdout: output,
