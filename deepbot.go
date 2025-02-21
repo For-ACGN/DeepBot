@@ -1,6 +1,7 @@
 package deepbot
 
 import (
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -37,6 +38,7 @@ type Config struct {
 type DeepBot struct {
 	config *Config
 	client *deepseek.Client
+	tools  []deepseek.Tool
 
 	users   map[int64]*user
 	usersMu sync.Mutex
@@ -55,8 +57,10 @@ func NewDeepBot(config *Config) *DeepBot {
 	bot := DeepBot{
 		config: config,
 		client: client,
+		tools:  defaultTools,
 		users:  make(map[int64]*user),
 	}
+	// register message handler
 	groupID := config.GroupID
 	filter := func(ctx *zero.Ctx) bool {
 		if ctx.Event.GroupID == 0 {
@@ -76,6 +80,7 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("deep.重置", filter).SetBlock(true).Handle(bot.onReset)
 	zero.OnCommand("deep.重置会话", filter).SetBlock(true).Handle(bot.onReset)
 	zero.OnCommand("deep.列出人设", filter).SetBlock(true).Handle(bot.onListCharacter)
+	zero.OnCommand("deep.人设列表", filter).SetBlock(true).Handle(bot.onListCharacter)
 	zero.OnCommand("deep.当前人设", filter).SetBlock(true).Handle(bot.onCurCharacter)
 	zero.OnCommand("deep.清除人设", filter).SetBlock(true).Handle(bot.onClrCharacter)
 	zero.OnCommand("deep.查看人设 ", filter).SetBlock(true).Handle(bot.onGetCharacter)
@@ -128,7 +133,7 @@ func (bot *DeepBot) onHelp(ctx *zero.Ctx) {
 	help += "ai      使用deepseek-r1模型，带有推理功能\n"
 	help += "deep.设置模型  设置当前模型: [r1、chat、coder]"
 	help += "deep.重置会话  重置当前对话上下文，可用reset、重置代替\n"
-	help += "deep.列出人设  列出所有人设\n"
+	help += "deep.列出人设  列出所有人设，可用人设列表代替\n"
 	help += "deep.当前人设  查看当前人设\n"
 	help += "deep.清除人设  清除当前人设\n"
 	help += "deep.查看人设  查看人设内容: [角色A]\n"
@@ -139,13 +144,20 @@ func (bot *DeepBot) onHelp(ctx *zero.Ctx) {
 }
 
 func replyMessage(ctx *zero.Ctx, msg string) {
+	// wait random time
+	time.Sleep(time.Duration(500 + rand.IntN(2000)))
+	// process private chat
 	if ctx.Event.GroupID == 0 {
 		ctx.Send(message.Text(msg))
 		return
 	}
-	// array := message.Message{}
-	// array = append(array, message.At(ctx.Event.UserID))
-	// array = append(array, message.Text(" "+msg))
-	// ctx.Send(array)
+	// random send message with at
+	if ctx.Event.IsToMe && rand.IntN(3) == 0 {
+		array := message.Message{}
+		array = append(array, message.At(ctx.Event.UserID))
+		array = append(array, message.Text(" "+msg))
+		ctx.Send(array)
+		return
+	}
 	ctx.Send(message.Text(msg))
 }
