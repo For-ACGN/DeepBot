@@ -74,54 +74,57 @@ func onEvalGo(src string) string {
 	return "程序的运行输出是: " + output.String()
 }
 
-// 用于测试模型的复杂函数调用链是否正常工作
-//
-// prompt: 你能帮我看看现在这地方的温度和相对湿度是多少吗
-//
-// var defaultTools = []deepseek.Tool{
-// 	toolGetLocation, toolGetTemperature, toolGetRelativeHumidity,
-// }
-//
-// var toolGetLocation = deepseek.Tool{
-// 	Type: "function",
-// 	Function: deepseek.Function{
-// 		Name:        "GetLocation",
-// 		Description: "获取当前所在的地区/城市名称。",
-// 	},
-// }
-//
-// var toolGetTemperature = deepseek.Tool{
-// 	Type: "function",
-// 	Function: deepseek.Function{
-// 		Name:        "GetTemperature",
-// 		Description: "获取当前地区/城市的温度。",
-// 		Parameters: &deepseek.FunctionParameters{
-// 			Type: "object",
-// 			Properties: map[string]interface{}{
-// 				"location": &toolArgument{
-// 					Type:        "string",
-// 					Description: "地区/城市的名称",
-// 				},
-// 			},
-// 			Required: []string{"location"},
-// 		},
-// 	},
-// }
-//
-// var toolGetRelativeHumidity = deepseek.Tool{
-// 	Type: "function",
-// 	Function: deepseek.Function{
-// 		Name:        "GetRelativeHumidity",
-// 		Description: "获取当前地区/城市的相对湿度。",
-// 		Parameters: &deepseek.FunctionParameters{
-// 			Type: "object",
-// 			Properties: map[string]interface{}{
-// 				"location": &toolArgument{
-// 					Type:        "string",
-// 					Description: "地区/城市的名称",
-// 				},
-// 			},
-// 			Required: []string{"location"},
-// 		},
-// 	},
-// }
+/*
+用于测试模型的复杂函数调用链是否正常工作
+
+prompt: 你能帮我看看现在这地方的温度和相对湿度是多少吗
+
+var defaultTools = []deepseek.Tool{
+	toolGetLocation, toolGetTemperature, toolGetRelativeHumidity,
+}
+
+var toolGetLocation = deepseek.Tool{
+	Type: "function",
+	Function: deepseek.Function{
+		Name:        "GetLocation",
+		Description: "获取当前所在的地区/城市名称。",
+	},
+}
+
+var toolGetTemperature = deepseek.Tool{
+	Type: "function",
+	Function: deepseek.Function{
+		Name:        "GetTemperature",
+		Description: "获取当前地区/城市的温度。",
+		Parameters: &deepseek.FunctionParameters{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"location": &toolArgument{
+					Type:        "string",
+					Description: "地区/城市的名称",
+				},
+			},
+			Required: []string{"location"},
+		},
+	},
+}
+
+var toolGetRelativeHumidity = deepseek.Tool{
+	Type: "function",
+	Function: deepseek.Function{
+		Name:        "GetRelativeHumidity",
+		Description: "获取当前地区/城市的相对湿度。",
+		Parameters: &deepseek.FunctionParameters{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"location": &toolArgument{
+					Type:        "string",
+					Description: "地区/城市的名称",
+				},
+			},
+			Required: []string{"location"},
+		},
+	},
+}
+
+*/

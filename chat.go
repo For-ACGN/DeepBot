@@ -169,9 +169,20 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, erro
 	// append user past round message
 	rounds := user.getRounds()
 	for i := 0; i < len(rounds); i++ {
-		messages = append(messages, rounds[i].Question)
-		messages = append(messages, rounds[i].Answer)
+		question := rounds[i].Question
+		if question.Role != "" {
+			messages = append(messages, question)
+		}
+		answer := rounds[i].Answer
+		if answer.Role != "" {
+			messages = append(messages, answer)
+		}
 	}
+
+	// fmt.Println("================================================")
+	// fmt.Println(messages)
+	// fmt.Println("================================================")
+
 	// append user question
 	question := ChatMessage{
 		Role:    constants.ChatMessageRoleUser,
@@ -184,7 +195,7 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("failed to create chat completion: %s", err)
 	}
-	resp, err = bot.doToolCall(req, resp)
+	resp, err = bot.doToolCall(req, resp, user)
 	if err != nil {
 		return "", fmt.Errorf("failed to process tool call: %s", err)
 	}
@@ -208,23 +219,23 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, erro
 	return response, nil
 }
 
-func (bot *DeepBot) doToolCall(req *ChatRequest, resp *ChatResponse) (*ChatResponse, error) {
+func (bot *DeepBot) doToolCall(req *ChatRequest, resp *ChatResponse, user *user) (*ChatResponse, error) {
 	toolCalls := resp.Choices[0].Message.ToolCalls
 	numCalls := len(toolCalls)
 	if numCalls == 0 {
 		return resp, nil
 	}
+	fmt.Println("num calls:", numCalls)
 
-	messages := req.Messages
-	messages = append(messages, ChatMessage{
+	question := ChatMessage{
 		Role:      constants.ChatMessageRoleAssistant,
 		ToolCalls: toolCalls,
-	})
-
-	fmt.Println("num calls:", numCalls)
+	}
+	var answer []ChatMessage
 	for i := 0; i < numCalls; i++ {
 		toolCall := toolCalls[i]
 		fnName := toolCall.Function.Name
+
 		var result string
 		switch fnName {
 		case "GetTime":
@@ -241,17 +252,27 @@ func (bot *DeepBot) doToolCall(req *ChatRequest, resp *ChatResponse) (*ChatRespo
 			}
 			fmt.Println(args.Src)
 			result = onEvalGo(args.Src)
+		// case "GetLocation":
+		// 	result = "当前城市是: 汉堡王"
+		// case "GetTemperature":
+		// 	result = "当前温度是: 8℃"
+		// case "GetRelativeHumidity":
+		// 	result = "当前相对湿度是: 32%"
 		default:
 			return nil, fmt.Errorf("unknown function: %s", fnName)
 		}
 		fmt.Println(fnName, result)
 
-		messages = append(messages, ChatMessage{
+		answer = append(answer, ChatMessage{
 			Role:       "tool",
 			Content:    result,
 			ToolCallID: toolCall.ID,
 		})
 	}
+
+	messages := req.Messages
+	messages = append(messages, question)
+	messages = append(messages, answer...)
 	toolReq := &ChatRequest{
 		Model:       deepseek.DeepSeekChat,
 		Messages:    messages,
@@ -263,7 +284,21 @@ func (bot *DeepBot) doToolCall(req *ChatRequest, resp *ChatResponse) (*ChatRespo
 	if err != nil {
 		return nil, err
 	}
-	return bot.doToolCall(toolReq, resp)
+
+	// 2025/02/22 经过测试，模型暂时不会将工具函数的返回结果应用在全局上下文，只有当前一轮的问答。
+	// 可能是为了避免不及时的函数结果，但是后期可以加一个标志，使其可以应用在全局上下文。
+	// rounds := user.getRounds()
+	// rounds = append(rounds, &round{
+	// 	Question: question,
+	// })
+	// for i := 0; i < len(answer); i++ {
+	// 	rounds = append(rounds, &round{
+	// 		Answer: answer[i],
+	// 	})
+	// }
+	// user.setRounds(rounds)
+
+	return bot.doToolCall(toolReq, resp, user)
 }
 
 func chatStream(client *deepseek.Client, request *deepseek.StreamChatCompletionRequest) (string, error) {
