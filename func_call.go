@@ -3,8 +3,11 @@ package deepbot
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"os"
 	"time"
 
+	"github.com/chromedp/chromedp"
 	"github.com/cohesion-org/deepseek-go"
 	"github.com/traefik/yaegi/interp"
 	"github.com/traefik/yaegi/stdlib"
@@ -32,7 +35,7 @@ var toolEvalGo = deepseek.Tool{
 		Description: "传入Go语言的源码，返回该程序运行时产生的输出，" +
 			"如果模型需要借助外部程序，可以调用这个函数。" +
 			"注意，请将参数放入源码中，这个函数只有一个参数用来接收源码，" +
-			"如果函数运行有问题，该函数将会返回以\"Go Error: \"开头的错误信息，" +
+			"如果EvalGo运行有问题，将会返回以\"Go Error: \"开头的错误信息，" +
 			"否则正常返回程序的输出，即使这个程序运行时产生了错误。",
 		Parameters: &deepseek.FunctionParameters{
 			Type: "object",
@@ -52,7 +55,9 @@ func onGetTime() string {
 	return "现在的时间是: " + s
 }
 
-func onEvalGo(src string) string {
+func onEvalGo(ctx context.Context, src string) (string, error) {
+	fmt.Println("================Eval================")
+	fmt.Println(src)
 	stdin := bytes.NewReader(nil)
 	output := bytes.NewBuffer(make([]byte, 0, 4096))
 	opts := interp.Options{
@@ -63,15 +68,43 @@ func onEvalGo(src string) string {
 	interpreter := interp.New(opts)
 	err := interpreter.Use(stdlib.Symbols)
 	if err != nil {
-		return "Go Error: " + err.Error()
+		return "", err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
 	_, err = interpreter.EvalWithContext(ctx, src)
 	if err != nil {
-		return "Go Error: " + err.Error()
+		return "", err
 	}
-	return "程序的运行输出是: " + output.String()
+	return output.String(), nil
+}
+
+func onFetchURL(ctx context.Context, url string) (string, error) {
+	fmt.Println("fetch:", url)
+
+	tempDir, err := os.MkdirTemp("", "chromedp-*")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	options := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath(`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`),
+		chromedp.UserDataDir(tempDir),
+	)
+	ctx, cancel := chromedp.NewExecAllocator(ctx, options...)
+	defer cancel()
+
+	ctx, cancel = chromedp.NewContext(ctx)
+	defer cancel()
+	// var output string
+	tasks := []chromedp.Action{
+		chromedp.Navigate(url),
+		// chromedp.TextContent(".h", &output, chromedp.NodeVisible),
+	}
+	err = chromedp.Run(ctx, tasks...)
+	if err != nil {
+		return "", err
+	}
+	return "", nil
 }
 
 /*
