@@ -14,6 +14,9 @@ import (
 	"github.com/wdvxdr1123/ZeroBot"
 )
 
+const promptToolCall = "" +
+	"你可以生成并且执行Go语言代码，来访问原先你访问不到的外部资源，具体请使用EvalGo工具函数。"
+
 func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 	msg := ctx.MessageString()
 	msg = strings.Replace(msg, "chat ", "", 1)
@@ -24,7 +27,7 @@ func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 		Model:       deepseek.DeepSeekChat,
 		Temperature: 1.3,
 		MaxTokens:   8192,
-		// Tools:       bot.tools,
+		Tools:       bot.tools,
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
@@ -152,8 +155,11 @@ func (bot *DeepBot) onReset(ctx *zero.Ctx) {
 
 func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, error) {
 	var messages []ChatMessage
-	// append system prompt
+	// build and append system prompt
 	character := user.getCharacter()
+	if len(bot.tools) > 0 {
+		character += "\n" + promptToolCall
+	}
 	if character != "" {
 		messages = append(messages, ChatMessage{
 			Role:    constants.ChatMessageRoleSystem,
@@ -178,7 +184,7 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("failed to create chat completion: %s", err)
 	}
-	err = bot.doToolCall(req, resp)
+	resp, err = bot.doToolCall(req, resp)
 	if err != nil {
 		return "", fmt.Errorf("failed to process tool call: %s", err)
 	}
@@ -202,74 +208,60 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, erro
 	return response, nil
 }
 
-func (bot *DeepBot) doToolCall(req *ChatRequest, resp *ChatResponse) error {
+func (bot *DeepBot) doToolCall(req *ChatRequest, resp *ChatResponse) (*ChatResponse, error) {
 	toolCalls := resp.Choices[0].Message.ToolCalls
-	if len(toolCalls) == 0 {
-		fmt.Println("debug: exit processToolCall")
-		return nil
+	numCalls := len(toolCalls)
+	if numCalls == 0 {
+		return resp, nil
 	}
-	tc := toolCalls[0]
-	fmt.Println(tc)
-	fmt.Println(tc.Function.Name)
 
-	msg := resp.Choices[0].Message
-	fmt.Println(msg.Role)
-	fmt.Println(msg.Content)
-
-	newMsg := req.Messages
-	newMsg = append(newMsg, ChatMessage{
-		Role:       msg.Role,
-		Content:    msg.Content,
-		ToolCallID: tc.ID,
-		ToolCalls:  toolCalls,
+	messages := req.Messages
+	messages = append(messages, ChatMessage{
+		Role:      constants.ChatMessageRoleAssistant,
+		ToolCalls: toolCalls,
 	})
 
-	var result string
-	// switch tc.Function.Name {
-	// case "GetTime":
-	// 	result = onGetTime()
-	// case "EvalGo":
-	// 	decoder := json.NewDecoder(strings.NewReader(tc.Function.Arguments))
-	// 	decoder.DisallowUnknownFields()
-	// 	args := struct {
-	// 		Src string `json:"src"`
-	// 	}{}
-	// 	err := decoder.Decode(&args)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	result = onEvalGo(args.Src)
-	// }
+	fmt.Println("num calls:", numCalls)
+	for i := 0; i < numCalls; i++ {
+		toolCall := toolCalls[i]
+		fnName := toolCall.Function.Name
+		var result string
+		switch fnName {
+		case "GetTime":
+			result = onGetTime()
+		case "EvalGo":
+			decoder := json.NewDecoder(strings.NewReader(toolCall.Function.Arguments))
+			decoder.DisallowUnknownFields()
+			args := struct {
+				Src string `json:"src"`
+			}{}
+			err := decoder.Decode(&args)
+			if err != nil {
+				return nil, err
+			}
+			fmt.Println(args.Src)
+			result = onEvalGo(args.Src)
+		default:
+			return nil, fmt.Errorf("unknown function: %s", fnName)
+		}
+		fmt.Println(fnName, result)
 
-	decoder := json.NewDecoder(strings.NewReader(tc.Function.Arguments))
-	decoder.DisallowUnknownFields()
-	args := struct {
-		Src string `json:"src"`
-	}{}
-	err := decoder.Decode(&args)
-	if err != nil {
-		fmt.Println("panic::::!!!!!!!!!!!!!", err)
-		return err
+		messages = append(messages, ChatMessage{
+			Role:       "tool",
+			Content:    result,
+			ToolCallID: toolCall.ID,
+		})
 	}
-	result = onEvalGo(args.Src)
-	fmt.Println("onEvalGo result:", result)
-
-	newMsg = append(newMsg, ChatMessage{
-		Role:       "tool",
-		Content:    result,
-		ToolCallID: tc.ID,
-	})
-
 	toolReq := &ChatRequest{
 		Model:       deepseek.DeepSeekChat,
-		Messages:    newMsg,
+		Messages:    messages,
 		Temperature: 1.3,
 		MaxTokens:   8192,
 		Tools:       defaultTools,
 	}
-	resp, err = bot.client.CreateChatCompletion(context.Background(), toolReq)
+	resp, err := bot.client.CreateChatCompletion(context.Background(), toolReq)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return bot.doToolCall(toolReq, resp)
 }
