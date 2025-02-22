@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/cohesion-org/deepseek-go"
 	"github.com/cohesion-org/deepseek-go/constants"
@@ -195,7 +196,7 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("failed to create chat completion: %s", err)
 	}
-	resp, err = bot.doToolCall(req, resp, user)
+	resp, err = bot.doToolCalls(req, resp, user)
 	if err != nil {
 		return "", fmt.Errorf("failed to process tool call: %s", err)
 	}
@@ -219,7 +220,7 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, erro
 	return response, nil
 }
 
-func (bot *DeepBot) doToolCall(req *ChatRequest, resp *ChatResponse, user *user) (*ChatResponse, error) {
+func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user) (*ChatResponse, error) {
 	toolCalls := resp.Choices[0].Message.ToolCalls
 	numCalls := len(toolCalls)
 	if numCalls == 0 {
@@ -231,48 +232,23 @@ func (bot *DeepBot) doToolCall(req *ChatRequest, resp *ChatResponse, user *user)
 		Role:      constants.ChatMessageRoleAssistant,
 		ToolCalls: toolCalls,
 	}
-	var answer []ChatMessage
+	var answers []ChatMessage
 	for i := 0; i < numCalls; i++ {
 		toolCall := toolCalls[i]
-		fnName := toolCall.Function.Name
-
-		var result string
-		switch fnName {
-		case "GetTime":
-			result = onGetTime()
-		case "EvalGo":
-			decoder := json.NewDecoder(strings.NewReader(toolCall.Function.Arguments))
-			decoder.DisallowUnknownFields()
-			args := struct {
-				Src string `json:"src"`
-			}{}
-			err := decoder.Decode(&args)
-			if err != nil {
-				return nil, err
-			}
-			fmt.Println(args.Src)
-			result = onEvalGo(args.Src)
-		// case "GetLocation":
-		// 	result = "当前城市是: 汉堡王"
-		// case "GetTemperature":
-		// 	result = "当前温度是: 8℃"
-		// case "GetRelativeHumidity":
-		// 	result = "当前相对湿度是: 32%"
-		default:
-			return nil, fmt.Errorf("unknown function: %s", fnName)
+		answer, err := bot.doToolCall(toolCall)
+		if err != nil {
+			return nil, err
 		}
-		fmt.Println(fnName, result)
-
-		answer = append(answer, ChatMessage{
+		answers = append(answers, ChatMessage{
 			Role:       "tool",
-			Content:    result,
+			Content:    answer,
 			ToolCallID: toolCall.ID,
 		})
 	}
 
 	messages := req.Messages
 	messages = append(messages, question)
-	messages = append(messages, answer...)
+	messages = append(messages, answers...)
 	toolReq := &ChatRequest{
 		Model:       deepseek.DeepSeekChat,
 		Messages:    messages,
@@ -291,14 +267,67 @@ func (bot *DeepBot) doToolCall(req *ChatRequest, resp *ChatResponse, user *user)
 	// rounds = append(rounds, &round{
 	// 	Question: question,
 	// })
-	// for i := 0; i < len(answer); i++ {
+	// for i := 0; i < len(answers); i++ {
 	// 	rounds = append(rounds, &round{
 	// 		Answer: answer[i],
 	// 	})
 	// }
 	// user.setRounds(rounds)
 
-	return bot.doToolCall(toolReq, resp, user)
+	return bot.doToolCalls(toolReq, resp, user)
+}
+
+func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall) (string, error) {
+	decoder := json.NewDecoder(strings.NewReader(toolCall.Function.Arguments))
+	decoder.DisallowUnknownFields()
+
+	fnName := toolCall.Function.Name
+	var answer string
+	switch fnName {
+	case "GetTime":
+		answer = onGetTime()
+	case "EvalGo":
+		args := struct {
+			Src string `json:"src"`
+		}{}
+		err := decoder.Decode(&args)
+		if err != nil {
+			return "", err
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		output, err := onEvalGo(ctx, args.Src)
+		if err != nil {
+			return "Go Error: " + err.Error(), nil
+		}
+		answer = output
+	case "FetchURL":
+		args := struct {
+			URL string `json:"url"`
+		}{}
+		err := decoder.Decode(&args)
+		if err != nil {
+			return "", err
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		output, err := onFetchURL(ctx, args.URL)
+		if err != nil {
+			return "chromedp Error: " + err.Error(), nil
+		}
+		answer = output
+	// case "GetLocation":
+	// 	answer = "当前城市是: 汉堡王"
+	// case "GetTemperature":
+	// 	answer = "当前温度是: 8℃"
+	// case "GetRelativeHumidity":
+	// 	answer = "当前相对湿度是: 32%"
+	default:
+		return "", fmt.Errorf("unknown function: %s", fnName)
+	}
+	return answer, nil
 }
 
 func chatStream(client *deepseek.Client, request *deepseek.StreamChatCompletionRequest) (string, error) {
