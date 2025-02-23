@@ -18,13 +18,29 @@ type toolArgument struct {
 	Description string `json:"description"`
 }
 
-var defaultTools = []deepseek.Tool{toolGetTime, toolEvalGo}
-
 var toolGetTime = deepseek.Tool{
 	Type: "function",
 	Function: deepseek.Function{
 		Name:        "GetTime",
 		Description: "获取当前的日期以及时间，返回的时间字符串格式为RFC3339。",
+	},
+}
+
+var toolFetchURL = deepseek.Tool{
+	Type: "function",
+	Function: deepseek.Function{
+		Name:        "FetchURL",
+		Description: "使用浏览器去访问指定的URL，返回的结果是过滤后的可见文本内容",
+		Parameters: &deepseek.FunctionParameters{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"url": &toolArgument{
+					Type:        "string",
+					Description: "目标URL",
+				},
+			},
+			Required: []string{"url"},
+		},
 	},
 }
 
@@ -55,6 +71,65 @@ func onGetTime() string {
 	return "现在的时间是: " + s
 }
 
+func onFetchURL(ctx context.Context, opts []chromedp.ExecAllocatorOption, url string) (string, error) {
+	fmt.Println("fetch:", url)
+
+	tempDir, err := os.MkdirTemp("", "chromedp-*")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	options := []chromedp.ExecAllocatorOption{
+		chromedp.NoFirstRun,
+		chromedp.NoDefaultBrowserCheck,
+		chromedp.Headless,
+
+		// After Puppeteer's default behavior.
+		chromedp.Flag("disable-background-networking", true),
+		chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
+		chromedp.Flag("disable-background-timer-throttling", true),
+		chromedp.Flag("disable-backgrounding-occluded-windows", true),
+		chromedp.Flag("disable-breakpad", true),
+		chromedp.Flag("disable-client-side-phishing-detection", true),
+		chromedp.Flag("disable-default-apps", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disable-features", "site-per-process,Translate,BlinkGenPropertyTrees"),
+		chromedp.Flag("disable-hang-monitor", true),
+		chromedp.Flag("disable-ipc-flooding-protection", true),
+		chromedp.Flag("disable-popup-blocking", true),
+		chromedp.Flag("disable-prompt-on-repost", true),
+		chromedp.Flag("disable-renderer-backgrounding", true),
+		chromedp.Flag("disable-sync", true),
+		chromedp.Flag("force-color-profile", "srgb"),
+		chromedp.Flag("metrics-recording-only", true),
+		chromedp.Flag("safebrowsing-disable-auto-update", true),
+		chromedp.Flag("enable-automation", true),
+		chromedp.Flag("password-store", "basic"),
+		chromedp.Flag("use-mock-keychain", true),
+
+		chromedp.UserDataDir(tempDir),
+	}
+	options = append(options, opts...)
+
+	ctx, cancel := chromedp.NewExecAllocator(ctx, options...)
+	defer cancel()
+	ctx, cancel = chromedp.NewContext(ctx)
+	defer cancel()
+
+	var output string
+	tasks := []chromedp.Action{
+		chromedp.Navigate(url),
+		chromedp.Sleep(time.Second),
+		chromedp.Text("/html/body", &output, chromedp.BySearch),
+	}
+	err = chromedp.Run(ctx, tasks...)
+	if err != nil {
+		return "", err
+	}
+	return output, nil
+}
+
 func onEvalGo(ctx context.Context, src string) (string, error) {
 	fmt.Println("================Eval================")
 	fmt.Println(src)
@@ -75,36 +150,6 @@ func onEvalGo(ctx context.Context, src string) (string, error) {
 		return "", err
 	}
 	return output.String(), nil
-}
-
-func onFetchURL(ctx context.Context, url string) (string, error) {
-	fmt.Println("fetch:", url)
-
-	tempDir, err := os.MkdirTemp("", "chromedp-*")
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
-	options := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.ExecPath(`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`),
-		chromedp.UserDataDir(tempDir),
-	)
-	ctx, cancel := chromedp.NewExecAllocator(ctx, options...)
-	defer cancel()
-
-	ctx, cancel = chromedp.NewContext(ctx)
-	defer cancel()
-	// var output string
-	tasks := []chromedp.Action{
-		chromedp.Navigate(url),
-		// chromedp.TextContent(".h", &output, chromedp.NodeVisible),
-	}
-	err = chromedp.Run(ctx, tasks...)
-	if err != nil {
-		return "", err
-	}
-	return "", nil
 }
 
 /*
