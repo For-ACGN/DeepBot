@@ -1,6 +1,7 @@
 package deepbot
 
 import (
+	"log"
 	"math/rand/v2"
 	"sync"
 	"time"
@@ -37,6 +38,26 @@ type Config struct {
 			Token   string `toml:"token"`
 		} `toml:"ws_server"`
 	} `toml:"onebot"`
+
+	Render struct {
+		Enabled  bool   `toml:"enabled"`
+		Width    int64  `toml:"width"`
+		Height   int64  `toml:"height"`
+		ExecPath string `toml:"exec_path"`
+		DataDir  string `toml:"data_dir"`
+	} `toml:"md_render"`
+
+	FetchURL struct {
+		Enabled  bool   `toml:"enabled"`
+		Timeout  int    `toml:"timeout"`
+		ProxyURL string `toml:"proxy_url"`
+		ExecPath string `toml:"exec_path"`
+	} `toml:"fetch_url"`
+
+	EvalGo struct {
+		Enabled bool `toml:"enabled"`
+		Timeout int  `toml:"timeout"`
+	} `toml:"eval_go"`
 }
 
 type DeepBot struct {
@@ -143,12 +164,25 @@ func (bot *DeepBot) onHelp(ctx *zero.Ctx) {
 	help += "deep.选择人设  选择一个人设: [角色A]\n"
 	help += "deep.添加人设  添加一个人设: [角色A] [人设内容]\n"
 	help += "deep.删除人设  删除一个人设: [角色A]"
-	replyMessage(ctx, help)
+	bot.replyMessage(ctx, help)
 }
 
-func replyMessage(ctx *zero.Ctx, msg string) {
+func (bot *DeepBot) replyMessage(ctx *zero.Ctx, msg string) {
 	// wait random time
 	time.Sleep(time.Duration(500 + rand.IntN(2000)))
+	if !isMarkdown(msg) || !bot.config.Render.Enabled {
+		sendText(ctx, msg)
+		return
+	}
+	img, err := bot.markdownToImage(msg)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	sendImage(ctx, img)
+}
+
+func sendText(ctx *zero.Ctx, msg string) {
 	// process private chat
 	if ctx.Event.GroupID == 0 {
 		ctx.Send(message.Text(msg))
@@ -163,4 +197,21 @@ func replyMessage(ctx *zero.Ctx, msg string) {
 		return
 	}
 	ctx.Send(message.Text(msg))
+}
+
+func sendImage(ctx *zero.Ctx, img []byte) {
+	// process private chat
+	if ctx.Event.GroupID == 0 {
+		ctx.Send(message.ImageBytes(img))
+		return
+	}
+	// random send message with at
+	if ctx.Event.IsToMe && rand.IntN(3) == 0 {
+		array := message.Message{}
+		array = append(array, message.At(ctx.Event.UserID))
+		array = append(array, message.ImageBytes(img))
+		ctx.Send(array)
+		return
+	}
+	ctx.Send(message.ImageBytes(img))
 }

@@ -36,7 +36,7 @@ func (bot *DeepBot) onListCharacter(ctx *zero.Ctx) {
 		list = "当前人设列表: " + list
 	}
 
-	replyMessage(ctx, list)
+	bot.replyMessage(ctx, list)
 }
 
 func (bot *DeepBot) onCurCharacter(ctx *zero.Ctx) {
@@ -56,7 +56,7 @@ func (bot *DeepBot) onCurCharacter(ctx *zero.Ctx) {
 		char = "当前人设: " + char
 	}
 
-	replyMessage(ctx, char)
+	bot.replyMessage(ctx, char)
 }
 
 func (bot *DeepBot) onGetCharacter(ctx *zero.Ctx) {
@@ -64,12 +64,12 @@ func (bot *DeepBot) onGetCharacter(ctx *zero.Ctx) {
 
 	msg := textToArgN(ctx.MessageString(), 2)
 	if len(msg) != 2 {
-		replyMessage(ctx, "非法参数格式")
+		bot.replyMessage(ctx, "非法参数格式")
 		return
 	}
 	name := msg[1]
 	if name == " " || name == "" {
-		replyMessage(ctx, "非法参数格式")
+		bot.replyMessage(ctx, "非法参数格式")
 		return
 	}
 
@@ -77,7 +77,7 @@ func (bot *DeepBot) onGetCharacter(ctx *zero.Ctx) {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		log.Printf("failed to read character file: %s\n", err)
-		replyMessage(ctx, "人设不存在")
+		bot.replyMessage(ctx, "人设不存在")
 		return
 	}
 
@@ -86,7 +86,7 @@ func (bot *DeepBot) onGetCharacter(ctx *zero.Ctx) {
 		char = "当前人设内容为空"
 	}
 
-	replyMessage(ctx, char)
+	bot.replyMessage(ctx, char)
 }
 
 func (bot *DeepBot) onClrCharacter(ctx *zero.Ctx) {
@@ -101,7 +101,7 @@ func (bot *DeepBot) onClrCharacter(ctx *zero.Ctx) {
 
 	user.setCharacter("")
 
-	replyMessage(ctx, "清除人设成功")
+	bot.replyMessage(ctx, "清除人设成功")
 }
 
 func (bot *DeepBot) onSetCharacter(ctx *zero.Ctx) {
@@ -109,12 +109,12 @@ func (bot *DeepBot) onSetCharacter(ctx *zero.Ctx) {
 
 	msg := textToArgN(ctx.MessageString(), 2)
 	if len(msg) != 2 {
-		replyMessage(ctx, "非法参数格式")
+		bot.replyMessage(ctx, "非法参数格式")
 		return
 	}
 	name := msg[1]
 	if name == " " || name == "" {
-		replyMessage(ctx, "非法参数格式")
+		bot.replyMessage(ctx, "非法参数格式")
 		return
 	}
 
@@ -122,7 +122,7 @@ func (bot *DeepBot) onSetCharacter(ctx *zero.Ctx) {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		log.Printf("failed to read character file: %s\n", err)
-		replyMessage(ctx, "人设不存在")
+		bot.replyMessage(ctx, "人设不存在")
 		return
 	}
 	file = fmt.Sprintf("data/characters/%d/current.cfg", user.id)
@@ -134,7 +134,7 @@ func (bot *DeepBot) onSetCharacter(ctx *zero.Ctx) {
 
 	user.setCharacter(string(content))
 
-	replyMessage(ctx, "选择人设成功")
+	bot.replyMessage(ctx, "选择人设成功")
 }
 
 func (bot *DeepBot) onAddCharacter(ctx *zero.Ctx) {
@@ -142,22 +142,22 @@ func (bot *DeepBot) onAddCharacter(ctx *zero.Ctx) {
 
 	msg := textToArgN(ctx.MessageString(), 3)
 	if len(msg) != 3 {
-		replyMessage(ctx, "非法参数格式")
+		bot.replyMessage(ctx, "非法参数格式")
 		return
 	}
 	name := msg[1]
 	if name == " " || name == "" {
-		replyMessage(ctx, "非法参数格式")
+		bot.replyMessage(ctx, "非法参数格式")
 		return
 	}
 	if len(name) > 30 {
-		replyMessage(ctx, "人设名称太长")
+		bot.replyMessage(ctx, "人设名称太长")
 		return
 	}
 
 	content := msg[2]
 	if content == " " || content == "" {
-		replyMessage(ctx, "人设内容为空")
+		bot.replyMessage(ctx, "人设内容为空")
 		return
 	}
 
@@ -168,7 +168,7 @@ func (bot *DeepBot) onAddCharacter(ctx *zero.Ctx) {
 		return
 	}
 
-	replyMessage(ctx, "添加人设成功")
+	bot.replyMessage(ctx, "添加人设成功")
 }
 
 func (bot *DeepBot) onDelCharacter(ctx *zero.Ctx) {
@@ -176,12 +176,12 @@ func (bot *DeepBot) onDelCharacter(ctx *zero.Ctx) {
 
 	msg := textToArgN(ctx.MessageString(), 2)
 	if len(msg) != 2 {
-		replyMessage(ctx, "非法参数格式")
+		bot.replyMessage(ctx, "非法参数格式")
 		return
 	}
 	name := msg[1]
 	if name == " " || name == "" {
-		replyMessage(ctx, "非法参数格式")
+		bot.replyMessage(ctx, "非法参数格式")
 		return
 	}
 
@@ -189,7 +189,7 @@ func (bot *DeepBot) onDelCharacter(ctx *zero.Ctx) {
 	err := os.Remove(file)
 	if err != nil {
 		log.Printf("failed to remove character file: %s\n", err)
-		replyMessage(ctx, "人设不存在")
+		bot.replyMessage(ctx, "人设不存在")
 		return
 	}
 
@@ -207,5 +207,5 @@ func (bot *DeepBot) onDelCharacter(ctx *zero.Ctx) {
 		}
 	}
 
-	replyMessage(ctx, "删除人设成功")
+	bot.replyMessage(ctx, "删除人设成功")
 }

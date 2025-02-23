@@ -36,7 +36,7 @@ func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 		return
 	}
 
-	replyMessage(ctx, resp)
+	bot.replyMessage(ctx, resp)
 }
 
 func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
@@ -56,7 +56,7 @@ func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
 		return
 	}
 
-	replyMessage(ctx, resp)
+	bot.replyMessage(ctx, resp)
 }
 
 func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
@@ -76,7 +76,7 @@ func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
 		return
 	}
 
-	replyMessage(ctx, resp)
+	bot.replyMessage(ctx, resp)
 }
 
 func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
@@ -100,7 +100,7 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 	case deepseek.DeepSeekReasoner:
 		req.Temperature = 1.2
 	default:
-		replyMessage(ctx, "非法模型名称")
+		bot.replyMessage(ctx, "非法模型名称")
 		return
 	}
 	resp, err := bot.chat(req, user, msg)
@@ -109,20 +109,20 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 		return
 	}
 
-	replyMessage(ctx, resp)
+	bot.replyMessage(ctx, resp)
 }
 
 func (bot *DeepBot) onGetModel(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 	model := user.getModel()
 
-	replyMessage(ctx, "当前模型: "+model)
+	bot.replyMessage(ctx, "当前模型: "+model)
 }
 
 func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
 	msg := textToArgN(ctx.MessageString(), 2)
 	if len(msg) != 2 {
-		replyMessage(ctx, "非法参数格式")
+		bot.replyMessage(ctx, "非法参数格式")
 		return
 	}
 
@@ -137,21 +137,21 @@ func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
 	case "8b":
 		model = "deepseek-r1:8b" // 联合测试使用
 	default:
-		replyMessage(ctx, "非法模型名称")
+		bot.replyMessage(ctx, "非法模型名称")
 		return
 	}
 
 	user := bot.getUser(ctx.Event.UserID)
 	user.setModel(model)
 
-	replyMessage(ctx, "设置模型成功")
+	bot.replyMessage(ctx, "设置模型成功")
 }
 
 func (bot *DeepBot) onReset(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 	user.setRounds(nil)
 
-	replyMessage(ctx, "重置会话成功")
+	bot.replyMessage(ctx, "重置会话成功")
 }
 
 func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, error) {
@@ -239,6 +239,7 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println(answer)
 		answers = append(answers, ChatMessage{
 			Role:       "tool",
 			Content:    answer,
@@ -286,22 +287,7 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall) (string, error) {
 	switch fnName {
 	case "GetTime":
 		answer = onGetTime()
-	case "EvalGo":
-		args := struct {
-			Src string `json:"src"`
-		}{}
-		err := decoder.Decode(&args)
-		if err != nil {
-			return "", err
-		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		output, err := onEvalGo(ctx, args.Src)
-		if err != nil {
-			return "Go Error: " + err.Error(), nil
-		}
-		answer = output
 	case "FetchURL":
 		args := struct {
 			URL string `json:"url"`
@@ -318,17 +304,34 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall) (string, error) {
 			return "chromedp Error: " + err.Error(), nil
 		}
 		answer = output
-	// case "GetLocation":
-	// 	answer = "当前城市是: 汉堡王"
-	// case "GetTemperature":
-	// 	answer = "当前温度是: 8℃"
-	// case "GetRelativeHumidity":
-	// 	answer = "当前相对湿度是: 32%"
+	case "EvalGo":
+		args := struct {
+			Src string `json:"src"`
+		}{}
+		err := decoder.Decode(&args)
+		if err != nil {
+			return "", err
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		output, err := onEvalGo(ctx, args.Src)
+		if err != nil {
+			return "Go Error: " + err.Error(), nil
+		}
+		answer = output
 	default:
 		return "", fmt.Errorf("unknown function: %s", fnName)
 	}
 	return answer, nil
 }
+
+// case "GetLocation":
+// 	answer = "当前城市是: 汉堡王"
+// case "GetTemperature":
+// 	answer = "当前温度是: 8℃"
+// case "GetRelativeHumidity":
+// 	answer = "当前相对湿度是: 32%"
 
 func chatStream(client *deepseek.Client, request *deepseek.StreamChatCompletionRequest) (string, error) {
 	stream, err := client.CreateChatCompletionStream(context.Background(), request)
