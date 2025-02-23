@@ -2,10 +2,12 @@ package deepbot
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -15,6 +17,9 @@ import (
 	"github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
 )
+
+//go:embed asset
+var asset embed.FS
 
 const defaultDataDir = "data/chromedp"
 
@@ -28,6 +33,19 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 	opts := html.RendererOptions{Flags: htmlFlags}
 	renderer := html.NewRenderer(opts)
 	output := markdown.Render(doc, renderer)
+	// insert code about js and css for render code block
+	output = append(output, []byte(`
+<style>
+  code {
+    font-family: ui-monospace, SFMono-Regular, SF Mono,
+        Menlo, Consolas, Liberation Mono, monospace;
+  }
+</style>
+<link rel="stylesheet" href="asset/github-dark.min.css">
+<script src="asset/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+`)...)
+	fmt.Println(string(output))
 
 	// deploy a http server for headless browser
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -41,6 +59,7 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 		w.WriteHeader(200)
 		_, _ = w.Write(output)
 	})
+	serveMux.Handle("/asset/", http.FileServerFS(asset))
 	server := http.Server{
 		Handler: &serveMux,
 	}
@@ -89,6 +108,10 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = os.MkdirAll(dataDir, 0755)
+	if err != nil {
+		return nil, err
+	}
 	options = append(options, chromedp.UserDataDir(dataDir))
 
 	ctx, cancel := chromedp.NewExecAllocator(context.Background(), options...)
@@ -97,19 +120,14 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 	defer cancel()
 	var image []byte
 	tasks := []chromedp.Action{
-		chromedp.EmulateViewport(cfg.Width, cfg.Height),
+		chromedp.EmulateViewport(cfg.Width, cfg.Height, chromedp.EmulateScale(4)),
 		chromedp.Navigate(targetURL),
 		chromedp.Sleep(time.Second),
 		chromedp.FullScreenshot(&image, 100),
-		// chromedp.Sleep(time.Minute),
 	}
 	err = chromedp.Run(ctx, tasks...)
 	if err != nil {
 		return nil, err
 	}
 	return image, nil
-}
-
-func isMarkdown(text string) bool {
-	return true
 }
