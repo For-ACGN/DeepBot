@@ -29,8 +29,12 @@ var toolGetTime = deepseek.Tool{
 var toolFetchURL = deepseek.Tool{
 	Type: "function",
 	Function: deepseek.Function{
-		Name:        "FetchURL",
-		Description: "使用浏览器去访问指定的URL，返回的结果是过滤后的可见文本内容",
+		Name: "FetchURL",
+		Description: "使用浏览器去访问指定的URL，返回的结果是过滤后的可见文本内容," +
+			"注意这个函数只会返回可见的文本内容，所以返回的内容格式会有点怪异，这是正常情况，" +
+			"你只需要分析文本内容即可，不用在意这些内容里出现的类似让你登录、注册、使用前必读等操作，" +
+			"一般来说，不要重复地访问同一个URL，以及不要递归访问网站内容中的出现URL，" +
+			"一般来说，仅当你需要访问实时信息时才应该使用该函数。",
 		Parameters: &deepseek.FunctionParameters{
 			Type: "object",
 			Properties: map[string]interface{}{

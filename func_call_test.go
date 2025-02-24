@@ -6,11 +6,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/chromedp/chromedp"
 	"github.com/stretchr/testify/require"
 )
 
+func TestOnFetchURL(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	opts := []chromedp.ExecAllocatorOption{
+		chromedp.ExecPath(`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`),
+	}
+	output, err := onFetchURL(ctx, opts, "https://www.baidu.com/")
+	require.NoError(t, err)
+	fmt.Println(output)
+}
+
 func TestOnEvalGo(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	src := `
@@ -19,19 +32,10 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println("Hello World")
+	fmt.Println("Hello World!")
 }
 `
 	output, err := onEvalGo(ctx, src)
-	require.NoError(t, err)
-	fmt.Println(output)
-}
-
-func TestOnFetchURL(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	output, err := onFetchURL(ctx, "https://www.baidu.com/")
 	require.NoError(t, err)
 	fmt.Println(output)
 }
