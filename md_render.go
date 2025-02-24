@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-	
+
 	"github.com/chromedp/chromedp"
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
@@ -86,7 +86,7 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 </html>`
 	document = fmt.Sprintf(document, output)
 	fmt.Println(document)
-	
+
 	// deploy a http server for headless browser
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -106,13 +106,13 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 	go func() { _ = server.Serve(listener) }()
 	defer func() { _ = server.Close() }()
 	targetURL := fmt.Sprintf("http://%s/%s", listener.Addr(), randomName)
-	
+
 	// start headless browser to render it
 	options := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
 		chromedp.Headless,
-		
+
 		// After Puppeteer's default behavior.
 		chromedp.Flag("disable-background-networking", true),
 		chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
@@ -153,7 +153,7 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 		return nil, err
 	}
 	options = append(options, chromedp.UserDataDir(dataDir))
-	
+
 	ctx, cancel := chromedp.NewExecAllocator(context.Background(), options...)
 	defer cancel()
 	ctx, cancel = chromedp.NewContext(ctx)
