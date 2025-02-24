@@ -30,5 +30,6 @@ go.work.sum
 # Ignore running data
 data
 
-# Ignore rendered image
+# Ignore rendered image from test
 testdata/render.jpg
+testdata/help.jpg
