@@ -9,9 +9,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
-
+	
 	"github.com/chromedp/chromedp"
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
@@ -34,30 +33,71 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 	renderer := html.NewRenderer(opts)
 	output := markdown.Render(doc, renderer)
 	// insert code about js and css for render code block
-	output = append(output, []byte(`
+	document := `
+<html>
+
+<body>
+%s
+</body>
+
 <style>
   code {
     font-family: ui-monospace, SFMono-Regular, SF Mono,
         Menlo, Consolas, Liberation Mono, monospace;
+    background: #3C3D3E;
+    padding: 3px;
+    border-radius: 4px
+  }
+
+  table {
+    table-layout: auto;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    padding: 8px;
+    text-align: left;
+    border: 1px solid black;
+  }
+  
+  li {
+    padding: 4px;
+  }
+
+  body {
+    padding: 16px;
   }
 </style>
-<link rel="stylesheet" href="asset/github-dark.min.css">
-<script src="asset/highlight.min.js"></script>
-<script>hljs.highlightAll();</script>
-`)...)
-	fmt.Println(string(output))
 
+<link rel="stylesheet" href="asset/github-dark.min.css">
+
+<script src="asset/dark-reader.js"></script>
+<script src="asset/highlight.min.js"></script>
+
+<script>
+    DarkReader.enable({
+        brightness: 100,
+        contrast:   90,
+        sepia:      0
+    });
+    hljs.highlightAll();
+</script>
+
+</html>`
+	document = fmt.Sprintf(document, output)
+	fmt.Println(document)
+	
 	// deploy a http server for headless browser
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = listener.Close() }()
-	randomName := strconv.Itoa(int(rand.Uint32()))
+	randomName := fmt.Sprintf("%d.html", rand.Uint())
 	serveMux := http.ServeMux{}
 	serveMux.HandleFunc("/"+randomName, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		_, _ = w.Write(output)
+		_, _ = w.Write([]byte(document))
 	})
 	serveMux.Handle("/asset/", http.FileServerFS(asset))
 	server := http.Server{
@@ -66,13 +106,13 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 	go func() { _ = server.Serve(listener) }()
 	defer func() { _ = server.Close() }()
 	targetURL := fmt.Sprintf("http://%s/%s", listener.Addr(), randomName)
-
+	
 	// start headless browser to render it
 	options := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
 		chromedp.Headless,
-
+		
 		// After Puppeteer's default behavior.
 		chromedp.Flag("disable-background-networking", true),
 		chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
@@ -113,7 +153,7 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 		return nil, err
 	}
 	options = append(options, chromedp.UserDataDir(dataDir))
-
+	
 	ctx, cancel := chromedp.NewExecAllocator(context.Background(), options...)
 	defer cancel()
 	ctx, cancel = chromedp.NewContext(ctx)
