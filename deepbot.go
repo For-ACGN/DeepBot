@@ -1,6 +1,7 @@
 package deepbot
 
 import (
+	"embed"
 	"log"
 	"math/rand/v2"
 	"sync"
@@ -11,6 +12,9 @@ import (
 	"github.com/wdvxdr1123/ZeroBot/driver"
 	"github.com/wdvxdr1123/ZeroBot/message"
 )
+
+// just for prevent [import _ "embed"] :)
+var _ embed.FS
 
 type ChatRequest = deepseek.ChatCompletionRequest
 type ChatResponse = deepseek.ChatCompletionResponse
@@ -79,10 +83,19 @@ func NewDeepBot(config *Config) *DeepBot {
 	if timeout != 0 {
 		client.Timeout = time.Duration(timeout) * time.Millisecond
 	}
+	// build tools from config
+	var tools []deepseek.Tool
+	tools = append(tools, toolGetTime)
+	if config.FetchURL.Enabled {
+		tools = append(tools, toolFetchURL)
+	}
+	if config.EvalGo.Enabled {
+		tools = append(tools, toolEvalGo)
+	}
 	bot := DeepBot{
 		config: config,
 		client: client,
-		tools:  defaultTools,
+		tools:  tools,
 		users:  make(map[int64]*user),
 	}
 	// register message handler
@@ -148,29 +161,15 @@ func (bot *DeepBot) getUser(uid int64) *user {
 	return user
 }
 
+//go:embed help.md
+var helpMD string
+
 func (bot *DeepBot) onHelp(ctx *zero.Ctx) {
-	var help string
-	help += "[at]    使用当前模型进行对话\n"
-	help += "chat    使用deepseek-chat模型，适合通用对话\n"
-	help += "coder   使用deepseek-coder模型，适合编程\n"
-	help += "ai      使用deepseek-r1模型，带有推理功能\n"
-	help += "deep.当前模型  查看当前设置的模型\n"
-	help += "deep.设置模型  设置当前模型: [r1、chat、coder]\n"
-	help += "deep.重置会话  重置当前对话上下文，可用reset、重置代替\n"
-	help += "deep.列出人设  列出所有人设，可用人设列表代替\n"
-	help += "deep.当前人设  查看当前人设\n"
-	help += "deep.清除人设  清除当前人设\n"
-	help += "deep.查看人设  查看人设内容: [角色A]\n"
-	help += "deep.选择人设  选择一个人设: [角色A]\n"
-	help += "deep.添加人设  添加一个人设: [角色A] [人设内容]\n"
-	help += "deep.删除人设  删除一个人设: [角色A]"
-	bot.replyMessage(ctx, help)
+	bot.replyMessage(ctx, helpMD)
 }
 
 func (bot *DeepBot) replyMessage(ctx *zero.Ctx, msg string) {
-	// wait random time
-	time.Sleep(time.Duration(500 + rand.IntN(2000)))
-	if !isMarkdown(msg) || !bot.config.Render.Enabled {
+	if !bot.config.Render.Enabled || !isMarkdown(msg) {
 		sendText(ctx, msg)
 		return
 	}
@@ -183,6 +182,8 @@ func (bot *DeepBot) replyMessage(ctx *zero.Ctx, msg string) {
 }
 
 func sendText(ctx *zero.Ctx, msg string) {
+	// wait random time before send
+	time.Sleep(time.Duration(500 + rand.IntN(2000)))
 	// process private chat
 	if ctx.Event.GroupID == 0 {
 		ctx.Send(message.Text(msg))
