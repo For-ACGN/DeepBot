@@ -26,6 +26,15 @@ const promptToolCall = `
    禁止多次来回调用FetchURL工具函数，一轮对话中只允许使用一次FetchURL。
 `
 
+type chatResp struct {
+	Answer    string
+	Reasoning string
+}
+
+func (cr *chatResp) String() string {
+	return cr.Answer
+}
+
 func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 	msg := ctx.MessageString()
 	msg = strings.Replace(msg, "chat ", "", 1)
@@ -44,7 +53,7 @@ func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, resp)
+	bot.replyMessage(ctx, resp.Answer)
 }
 
 func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
@@ -64,7 +73,7 @@ func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, resp)
+	bot.replyMessage(ctx, resp.Answer)
 }
 
 func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
@@ -84,7 +93,35 @@ func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, resp)
+	bot.replyMessage(ctx, resp.Answer)
+}
+
+func (bot *DeepBot) onReasoning(ctx *zero.Ctx) {
+	msg := ctx.MessageString()
+	msg = strings.Replace(msg, "air ", "", 1)
+	fmt.Println("air", ctx.Event.GroupID, msg)
+	user := bot.getUser(ctx.Event.UserID)
+
+	req := &ChatRequest{
+		Model:       deepseek.DeepSeekReasoner,
+		Temperature: 1.2,
+		MaxTokens:   8192,
+	}
+	resp, err := bot.chat(req, user, msg)
+	if err != nil {
+		log.Printf("%s, failed to chat: %s\n", resp, err)
+		return
+	}
+
+	tpl := `
+<h3>思考过程</h3>
+<p>%s</p>
+
+<h3>回复内容</h3>
+<p>%s</p>
+`
+	data := fmt.Sprintf(tpl, resp.Reasoning, resp.Answer)
+	bot.replyMessage(ctx, data)
 }
 
 func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
@@ -117,7 +154,7 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, resp)
+	bot.replyMessage(ctx, resp.Answer)
 }
 
 func (bot *DeepBot) onGetModel(ctx *zero.Ctx) {
@@ -162,11 +199,40 @@ func (bot *DeepBot) onReset(ctx *zero.Ctx) {
 	bot.replyMessage(ctx, "重置会话成功")
 }
 
-func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, error) {
+func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (*chatResp, error) {
+	var err error
+	for i := 0; i < 3; i++ {
+		var resp *chatResp
+		resp, err = bot.tryChat(req, user, msg)
+		if err == nil {
+			return resp, nil
+		}
+		var retry bool
+		errStr := err.Error()
+		for _, es := range []string{
+			"failed to create chat completion",
+			"receive empty message content",
+		} {
+			if strings.Contains(errStr, es) {
+				retry = true
+				break
+			}
+		}
+		if retry {
+			fmt.Printf("[warning] retry chat with %d times\n", i+1)
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		break
+	}
+	return nil, err
+}
+
+func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp, error) {
 	var messages []ChatMessage
 	// build and append system prompt
 	character := user.getCharacter()
-	if len(bot.tools) > 1 {
+	if req.Model != deepseek.DeepSeekReasoner && len(bot.tools) > 1 {
 		character += "\n" + promptToolCall
 	}
 	if character != "" {
@@ -202,30 +268,34 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, erro
 	req.Messages = messages
 	resp, err := bot.client.CreateChatCompletion(context.Background(), req)
 	if err != nil {
-		return "", fmt.Errorf("failed to create chat completion: %s", err)
+		return nil, fmt.Errorf("failed to create chat completion: %s", err)
 	}
 	resp, err = bot.doToolCalls(req, resp, user)
 	if err != nil {
-		return "", fmt.Errorf("failed to process tool call: %s", err)
+		return nil, fmt.Errorf("failed to process tool call: %s", err)
 	}
 	cm := resp.Choices[0].Message
 	if cm.Role != constants.ChatMessageRoleAssistant {
-		return "", errors.New("invalid response role: " + cm.Role)
+		return nil, errors.New("invalid message role: " + cm.Role)
 	}
-	response := cm.Content
-	if response == "" {
-		return "", errors.New("receive empty response")
+	content := cm.Content
+	if content == "" {
+		return nil, errors.New("receive empty message content")
 	}
 	answer := ChatMessage{
 		Role:    constants.ChatMessageRoleAssistant,
-		Content: response,
+		Content: content,
 	}
 	rounds = append(rounds, &round{
 		Question: question,
 		Answer:   answer,
 	})
 	user.setRounds(rounds)
-	return response, nil
+	cr := &chatResp{
+		Answer:    content,
+		Reasoning: cm.ReasoningContent,
+	}
+	return cr, nil
 }
 
 func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user) (*ChatResponse, error) {
