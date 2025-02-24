@@ -15,3 +15,20 @@ group_id = [123456, 1234567]
     enabled = false
     url     = "ws://0.0.0.0:3001/"
     token   = "admin"
+
+[md_render]
+  enabled   = true
+  width     = 600
+  height    = 900
+  exec_path = "" # custom chromium kernel browser
+  data_dir  = ""
+
+[fetch_url]
+  enabled   = true
+  timeout   = 60000 # millisecond
+  proxy_url = ""
+  exec_path = "" # custom chromium kernel browser
+
+[eval_go]
+  enabled = true
+  timeout = 300000 # millisecond
