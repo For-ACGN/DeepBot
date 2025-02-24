@@ -10,13 +10,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chromedp/chromedp"
 	"github.com/cohesion-org/deepseek-go"
 	"github.com/cohesion-org/deepseek-go/constants"
 	"github.com/wdvxdr1123/ZeroBot"
 )
 
-const promptToolCall = "" +
-	"你可以生成并且执行Go语言代码，来访问原先你访问不到的外部资源，具体请使用EvalGo工具函数。"
+const promptToolCall = `
+[外部函数调用指南]
+   你可以使用浏览器来访问原先你访问不到的外部资源，具体请使用FetchURL工具函数。
+   你可以生成并且执行Go语言代码，来访问原先你访问不到的外部资源，具体请使用EvalGo工具函数。
+   请注意如果你只是需要浏览网页，请优先使用FetchURL，而不是生成相关代码使用EvalGo来访问。
+   一般来说，不要重复地访问同一个URL，以及不要递归访问网站内容中的出现URL。
+   一般来说，仅当你需要访问实时信息时才应该使用FetchURL工具函数。
+   禁止多次来回调用FetchURL工具函数，一轮对话中只允许使用一次FetchURL。
+`
 
 func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 	msg := ctx.MessageString()
@@ -158,7 +166,7 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (string, erro
 	var messages []ChatMessage
 	// build and append system prompt
 	character := user.getCharacter()
-	if len(bot.tools) > 0 {
+	if len(bot.tools) > 1 {
 		character += "\n" + promptToolCall
 	}
 	if character != "" {
@@ -239,13 +247,27 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(answer)
 		answers = append(answers, ChatMessage{
 			Role:       "tool",
 			Content:    answer,
 			ToolCallID: toolCall.ID,
 		})
+		fmt.Println(answer)
 	}
+
+	// 只允许使用一次 FetchURL
+	// tools := bot.tools
+	// fmt.Println(tools)
+	// for i := 0; i < numCalls; i++ {
+	// 	if toolCalls[i].Function.Name == "FetchURL" {
+	// 		for j := 0; j < len(tools); j++ {
+	// 			if tools[j].Function.Name == "FetchURL" {
+	// 				tools = append(tools[:j], tools[j+1:]...)
+	// 			}
+	// 		}
+	// 		fmt.Println(tools)
+	// 	}
+	// }
 
 	messages := req.Messages
 	messages = append(messages, question)
@@ -255,7 +277,7 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 		Messages:    messages,
 		Temperature: 1.3,
 		MaxTokens:   8192,
-		Tools:       defaultTools,
+		// Tools:       tools,
 	}
 	resp, err := bot.client.CreateChatCompletion(context.Background(), toolReq)
 	if err != nil {
@@ -274,7 +296,6 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 	// 	})
 	// }
 	// user.setRounds(rounds)
-
 	return bot.doToolCalls(toolReq, resp, user)
 }
 
@@ -287,7 +308,6 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall) (string, error) {
 	switch fnName {
 	case "GetTime":
 		answer = onGetTime()
-
 	case "FetchURL":
 		args := struct {
 			URL string `json:"url"`
@@ -297,9 +317,18 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall) (string, error) {
 			return "", err
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		timeout := time.Duration(bot.config.FetchURL.Timeout) * time.Millisecond
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
-		output, err := onFetchURL(ctx, args.URL)
+		var options []chromedp.ExecAllocatorOption
+		cfg := bot.config.FetchURL
+		if cfg.ProxyURL != "" {
+			options = append(options, chromedp.ProxyServer(cfg.ProxyURL))
+		}
+		if cfg.ExecPath != "" {
+			options = append(options, chromedp.ExecPath(cfg.ExecPath))
+		}
+		output, err := onFetchURL(ctx, options, args.URL)
 		if err != nil {
 			return "chromedp Error: " + err.Error(), nil
 		}
@@ -313,7 +342,8 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall) (string, error) {
 			return "", err
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		timeout := time.Duration(bot.config.EvalGo.Timeout) * time.Millisecond
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		output, err := onEvalGo(ctx, args.Src)
 		if err != nil {
