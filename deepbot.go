@@ -114,6 +114,7 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("chat ", filter).SetBlock(true).Handle(bot.onChat)
 	zero.OnCommand("coder ", filter).SetBlock(true).Handle(bot.onCoder)
 	zero.OnCommand("ai ", filter).SetBlock(true).Handle(bot.onReasoner)
+	zero.OnCommand("air ", filter).SetBlock(true).Handle(bot.onReasoning)
 	zero.OnCommand("deep.当前模型", filter).SetBlock(true).Handle(bot.onGetModel)
 	zero.OnCommand("deep.设置模型 ", filter).SetBlock(true).Handle(bot.onSetModel)
 	zero.OnCommand("deep.reset", filter).SetBlock(true).Handle(bot.onReset)
@@ -127,8 +128,12 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("deep.选择人设 ", filter).SetBlock(true).Handle(bot.onSetCharacter)
 	zero.OnCommand("deep.添加人设 ", filter).SetBlock(true).Handle(bot.onAddCharacter)
 	zero.OnCommand("deep.删除人设 ", filter).SetBlock(true).Handle(bot.onDelCharacter)
+	zero.OnCommand("help", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnCommand("deep.help", filter).SetBlock(true).Handle(bot.onHelp)
+	zero.OnCommand("deep.帮助文档", filter).SetBlock(true).Handle(bot.onHelp)
+	zero.OnCommand("deep.帮助信息", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnMessage(filter).SetBlock(true).Handle(bot.onMessage)
+	zero.OnNotice(filter).SetBlock(true).Handle(bot.onPoke)
 	return &bot
 }
 
@@ -168,12 +173,42 @@ func (bot *DeepBot) onHelp(ctx *zero.Ctx) {
 	bot.replyMessage(ctx, helpMD)
 }
 
+func (bot *DeepBot) onPoke(ctx *zero.Ctx) {
+	event := ctx.Event
+	if !event.IsToMe {
+		return
+	}
+	if event.NoticeType != "notify" || event.SubType != "poke" {
+		return
+	}
+
+	switch rand.IntN(2) {
+	case 0:
+		sendText(ctx, "别戳了")
+	case 1:
+		sendText(ctx, "再戳我就要爆了")
+	}
+}
+
 func (bot *DeepBot) replyMessage(ctx *zero.Ctx, msg string) {
-	if !bot.config.Render.Enabled || !isMarkdown(msg) {
+	if !bot.config.Render.Enabled {
 		sendText(ctx, msg)
 		return
 	}
-	img, err := bot.markdownToImage(msg)
+	if isMarkdown(msg) {
+		img, err := bot.markdownToImage(msg)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		sendImage(ctx, img)
+		return
+	}
+	if len(msg) < 2048 {
+		sendText(ctx, msg)
+		return
+	}
+	img, err := bot.htmlToImage(msg)
 	if err != nil {
 		log.Println(err)
 		return
@@ -183,7 +218,7 @@ func (bot *DeepBot) replyMessage(ctx *zero.Ctx, msg string) {
 
 func sendText(ctx *zero.Ctx, msg string) {
 	// wait random time before send
-	time.Sleep(time.Duration(500 + rand.IntN(2000)))
+	time.Sleep(time.Duration(500+rand.IntN(2000)) * time.Millisecond)
 	// process private chat
 	if ctx.Event.GroupID == 0 {
 		ctx.Send(message.Text(msg))
