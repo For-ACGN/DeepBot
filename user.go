@@ -21,11 +21,15 @@ type user struct {
 	// current character content
 	character string
 
+	// chat context content
 	rounds []*round
 	last   time.Time
 
-	// private chat
+	// current model name
 	model string
+
+	// store data for tool call
+	ctx map[string]interface{}
 
 	rwm sync.RWMutex
 }
@@ -35,6 +39,7 @@ func newUser(id int64) *user {
 		id:    id,
 		last:  time.Now(),
 		model: deepseek.DeepSeekChat,
+		ctx:   make(map[string]interface{}),
 	}
 	err := user.initDir()
 	if err != nil {
@@ -45,11 +50,11 @@ func newUser(id int64) *user {
 }
 
 func (user *user) initDir() error {
-	err := os.MkdirAll(fmt.Sprintf("data/characters/%d", user.id), 0644)
+	err := os.MkdirAll(fmt.Sprintf("data/characters/%d", user.id), 0755)
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(fmt.Sprintf("data/memory/%d", user.id), 0644)
+	err = os.MkdirAll(fmt.Sprintf("data/memory/%d", user.id), 0755)
 	if err != nil {
 		return err
 	}
@@ -111,4 +116,16 @@ func (user *user) setModel(model string) {
 	user.rwm.Lock()
 	defer user.rwm.Unlock()
 	user.model = model
+}
+
+func (user *user) getContext(key string) interface{} {
+	user.rwm.RLock()
+	defer user.rwm.RUnlock()
+	return user.ctx[key]
+}
+
+func (user *user) setContext(key string, data interface{}) {
+	user.rwm.Lock()
+	defer user.rwm.Unlock()
+	user.ctx[key] = data
 }
