@@ -4,23 +4,27 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/gomarkdown/markdown"
+	"github.com/gomarkdown/markdown/html"
+	"github.com/gomarkdown/markdown/parser"
 )
 
 // ================================ 以下代码由DeepSeek-R1生成 ================================
 
-type markdownDetector struct {
-	features []featureRule
+type mdDetector struct {
+	features []mdRule
 	maxScore float64
 }
 
-type featureRule struct {
+type mdRule struct {
 	pattern *regexp.Regexp
 	weight  float64
 	name    string
 }
 
-func newMarkdownDetector() *markdownDetector {
-	features := []featureRule{
+func newMDDetector() *mdDetector {
+	features := []mdRule{
 		// 标题: # 后跟空格和文本
 		{regexp.MustCompile(`(?m)^#{1,6}\s+.+$`), 2.0, "header"},
 		// 列表项: */-/数字. 后跟空格
@@ -36,10 +40,10 @@ func newMarkdownDetector() *markdownDetector {
 		// 表格
 		{regexp.MustCompile(`(?m)^\|.*\|$`), 3.0, "table"},
 	}
-	return &markdownDetector{features: features}
+	return &mdDetector{features: features}
 }
 
-func (md *markdownDetector) Analyze(text string) float64 {
+func (md *mdDetector) Analyze(text string) float64 {
 	lines := md.preprocess(text)
 	score := 0.0
 	inCodeBlock := false
@@ -74,12 +78,12 @@ func (md *markdownDetector) Analyze(text string) float64 {
 	return md.normalizeScore(score)
 }
 
-func (md *markdownDetector) preprocess(text string) []string {
+func (md *mdDetector) preprocess(text string) []string {
 	stripped := regexp.MustCompile("(?s)```.*?```").ReplaceAllString(text, "")
 	return strings.Split(stripped, "\n")
 }
 
-func (md *markdownDetector) normalizeScore(score float64) float64 {
+func (md *mdDetector) normalizeScore(score float64) float64 {
 	if md.maxScore == 0 {
 		return 0.0
 	}
@@ -91,8 +95,23 @@ func (md *markdownDetector) normalizeScore(score float64) float64 {
 }
 
 func isMarkdown(text string) bool {
-	detector := newMarkdownDetector()
+	if strings.Count(text, "```") >= 2 {
+		return true
+	}
+	detector := newMDDetector()
 	score := detector.Analyze(text)
 	fmt.Println("markdown score:", score)
 	return score >= 10
+}
+
+func markdownToHTML(md string) string {
+	// create Markdown parser with extensions
+	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
+	p := parser.NewWithExtensions(extensions)
+	doc := p.Parse([]byte(md))
+	// create HTML renderer with extensions
+	htmlFlags := html.CommonFlags | html.HrefTargetBlank
+	opts := html.RendererOptions{Flags: htmlFlags}
+	renderer := html.NewRenderer(opts)
+	return string(markdown.Render(doc, renderer))
 }
