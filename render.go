@@ -12,9 +12,6 @@ import (
 	"time"
 
 	"github.com/chromedp/chromedp"
-	"github.com/gomarkdown/markdown"
-	"github.com/gomarkdown/markdown/html"
-	"github.com/gomarkdown/markdown/parser"
 )
 
 //go:embed asset
@@ -23,15 +20,11 @@ var asset embed.FS
 const defaultDataDir = "data/chromedp"
 
 func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
-	// create Markdown parser with extensions
-	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
-	p := parser.NewWithExtensions(extensions)
-	doc := p.Parse([]byte(md))
-	// create HTML renderer with extensions
-	htmlFlags := html.CommonFlags | html.HrefTargetBlank
-	opts := html.RendererOptions{Flags: htmlFlags}
-	renderer := html.NewRenderer(opts)
-	output := markdown.Render(doc, renderer)
+	output := markdownToHTML(md)
+	return bot.htmlToImage(output)
+}
+
+func (bot *DeepBot) htmlToImage(content string) ([]byte, error) {
 	// insert code about js and css for render code block
 	document := `
 <html>
@@ -41,9 +34,24 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 </body>
 
 <style>
-  code {
-    font-family: ui-monospace, SFMono-Regular, SF Mono,
-        Menlo, Consolas, Liberation Mono, monospace;
+  @font-face {
+      font-family: 'Noto Sans SC';
+      src: url('asset/font/NotoSansSC-VariableFont_wght.ttf') format('truetype');
+      font-style: normal;
+  }
+
+  @font-face {
+      font-family: 'Roboto Mono';
+      src: url('asset/font/RobotoMono-VariableFont_wght.ttf') format('truetype');
+      font-style: normal;
+  }
+
+  * {
+    font-family: 'Noto Sans SC';
+  }
+
+  code, pre {
+    font-family: 'Roboto Mono', 'Noto Sans SC';
     background: #3C3D3E;
     padding: 3px;
     border-radius: 4px
@@ -77,14 +85,14 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 <script>
     DarkReader.enable({
         brightness: 100,
-        contrast:   90,
+        contrast:   95,
         sepia:      0
     });
     hljs.highlightAll();
 </script>
 
 </html>`
-	document = fmt.Sprintf(document, output)
+	document = fmt.Sprintf(document, content)
 	fmt.Println(document)
 
 	// deploy a http server for headless browser
