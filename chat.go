@@ -115,13 +115,27 @@ func (bot *DeepBot) onReasoning(ctx *zero.Ctx) {
 
 	tpl := `
 <h3>思考过程</h3>
-<p>%s</p>
+<div>%s</div>
 
 <h3>回复内容</h3>
-<p>%s</p>
+<div>%s</div>
 `
-	data := fmt.Sprintf(tpl, resp.Reasoning, resp.Answer)
-	bot.replyMessage(ctx, data)
+	reasoning := resp.Reasoning
+	if isMarkdown(reasoning) {
+		reasoning = markdownToHTML(reasoning)
+	}
+	answer := resp.Answer
+	if isMarkdown(answer) {
+		answer = markdownToHTML(answer)
+	}
+	output := fmt.Sprintf(tpl, reasoning, answer)
+
+	img, err := bot.htmlToImage(output)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	sendImage(ctx, img)
 }
 
 func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
@@ -219,7 +233,7 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (*chatResp, e
 			}
 		}
 		if retry {
-			fmt.Printf("[warning] retry chat with %d times\n", i+1)
+			fmt.Printf("[warning] retry send chat request with %d times\n", i+1)
 			time.Sleep(3 * time.Second)
 			continue
 		}
@@ -270,10 +284,15 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chat completion: %s", err)
 	}
+	// reset usage counter before process tool calls
+	user.setContext(usageGetTime, 0)
+	user.setContext(usageFetchURL, 0)
+	user.setContext(usageEvalGo, 0)
 	resp, err = bot.doToolCalls(req, resp, user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process tool call: %s", err)
 	}
+	// process response
 	cm := resp.Choices[0].Message
 	if cm.Role != constants.ChatMessageRoleAssistant {
 		return nil, errors.New("invalid message role: " + cm.Role)
@@ -313,7 +332,7 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 	var answers []ChatMessage
 	for i := 0; i < numCalls; i++ {
 		toolCall := toolCalls[i]
-		answer, err := bot.doToolCall(toolCall)
+		answer, err := bot.doToolCall(toolCall, user)
 		if err != nil {
 			return nil, err
 		}
@@ -329,9 +348,9 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 	// tools := bot.tools
 	// fmt.Println(tools)
 	// for i := 0; i < numCalls; i++ {
-	// 	if toolCalls[i].Function.Name == "FetchURL" {
+	// 	if toolCalls[i].Function.Name == fnFetchURL {
 	// 		for j := 0; j < len(tools); j++ {
-	// 			if tools[j].Function.Name == "FetchURL" {
+	// 			if tools[j].Function.Name == fnFetchURL {
 	// 				tools = append(tools[:j], tools[j+1:]...)
 	// 			}
 	// 		}
@@ -369,16 +388,28 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 	return bot.doToolCalls(toolReq, resp, user)
 }
 
-func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall) (string, error) {
+func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall, user *user) (string, error) {
 	decoder := json.NewDecoder(strings.NewReader(toolCall.Function.Arguments))
 	decoder.DisallowUnknownFields()
 
 	fnName := toolCall.Function.Name
 	var answer string
 	switch fnName {
-	case "GetTime":
+	case fnGetTime:
+		usage := user.getContext(usageGetTime).(int) + 1
+		if usage >= 5 {
+			return "", fmt.Errorf("too many calls about %s", fnGetTime)
+		}
+		user.setContext(usageGetTime, usage)
+
 		answer = onGetTime()
-	case "FetchURL":
+	case fnFetchURL:
+		usage := user.getContext(usageFetchURL).(int) + 1
+		if usage >= 3 {
+			return "", fmt.Errorf("too many calls about %s", fnFetchURL)
+		}
+		user.setContext(usageFetchURL, usage)
+
 		args := struct {
 			URL string `json:"url"`
 		}{}
@@ -400,10 +431,16 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall) (string, error) {
 		}
 		output, err := onFetchURL(ctx, options, args.URL)
 		if err != nil {
-			return "chromedp Error: " + err.Error(), nil
+			return "Chromedp Error: " + err.Error(), nil
 		}
 		answer = output
-	case "EvalGo":
+	case fnEvalGo:
+		usage := user.getContext(usageEvalGo).(int) + 1
+		if usage >= 5 {
+			return "", fmt.Errorf("too many calls about %s", fnEvalGo)
+		}
+		user.setContext(usageEvalGo, usage)
+
 		args := struct {
 			Src string `json:"src"`
 		}{}
