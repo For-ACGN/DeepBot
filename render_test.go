@@ -17,7 +17,7 @@ func init() {
 	testBot = NewDeepBot(cfg)
 }
 
-func TestMarkdownToHTML(t *testing.T) {
+func TestMarkdownToImage(t *testing.T) {
 	defer func() { _ = os.RemoveAll(defaultDataDir) }()
 
 	md, err := os.ReadFile("testdata/message.md")
@@ -26,7 +26,20 @@ func TestMarkdownToHTML(t *testing.T) {
 	output, err := testBot.markdownToImage(string(md))
 	require.NoError(t, err)
 
-	err = os.WriteFile("testdata/render.jpg", output, 0600)
+	err = os.WriteFile("testdata/markdown.jpg", output, 0600)
+	require.NoError(t, err)
+}
+
+func TestHTMLToImage(t *testing.T) {
+	defer func() { _ = os.RemoveAll(defaultDataDir) }()
+
+	data, err := os.ReadFile("testdata/message.html")
+	require.NoError(t, err)
+
+	output, err := testBot.htmlToImage(string(data))
+	require.NoError(t, err)
+
+	err = os.WriteFile("testdata/html.jpg", output, 0600)
 	require.NoError(t, err)
 }
 
