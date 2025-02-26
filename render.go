@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -16,8 +15,6 @@ import (
 
 //go:embed asset
 var asset embed.FS
-
-const defaultDataDir = "data/chromedp"
 
 func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 	output := markdownToHTML(md)
@@ -27,60 +24,91 @@ func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 func (bot *DeepBot) htmlToImage(content string) ([]byte, error) {
 	// insert code about js and css for render code block
 	document := `
+<!DOCTYPE html>
 <html>
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="stylesheet" href="asset/github-dark.min.css">
+  <link rel="stylesheet" href="asset/katex.min.css">
+
+  <style>
+    @font-face {
+        font-family: 'Noto Sans SC';
+        src: url('asset/font/NotoSansSC-VariableFont_wght.ttf') format('truetype');
+        font-style: normal;
+    }
+
+    @font-face {
+        font-family: 'Roboto Mono';
+        src: url('asset/font/RobotoMono-VariableFont_wght.ttf') format('truetype');
+        font-style: normal;
+    }
+
+    @font-face {
+        font-family: 'NotoColorEmoji';
+        src: url('asset/font/NotoColorEmoji-Regular.ttf') format('truetype');
+        font-style: normal;
+    }
+
+    * {
+      font-family: 'Noto Sans SC', 'NotoColorEmoji';
+    }
+
+    pre {
+      max-width: 100%%;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    code {
+      font-family: 'Roboto Mono', 'Noto Sans SC', 'NotoColorEmoji';
+      background: #3C3D3E;
+      padding: 3px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    table {
+      table-layout: auto;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 8px;
+      text-align: left;
+      border: 1px solid black;
+    }
+
+    li {
+      padding: 4px;
+    }
+
+    tr:nth-child(even) {
+      background-color: #1D1F20;
+    }
+
+    tr:nth-child(odd) {
+      background-color: #262C36;
+    }
+
+    body {
+      padding: 16px;
+    }
+  </style>
+</head>
 
 <body>
 %s
 </body>
 
-<style>
-  @font-face {
-      font-family: 'Noto Sans SC';
-      src: url('asset/font/NotoSansSC-VariableFont_wght.ttf') format('truetype');
-      font-style: normal;
-  }
-
-  @font-face {
-      font-family: 'Roboto Mono';
-      src: url('asset/font/RobotoMono-VariableFont_wght.ttf') format('truetype');
-      font-style: normal;
-  }
-
-  * {
-    font-family: 'Noto Sans SC';
-  }
-
-  code, pre {
-    font-family: 'Roboto Mono', 'Noto Sans SC';
-    background: #3C3D3E;
-    padding: 3px;
-    border-radius: 4px
-  }
-
-  table {
-    table-layout: auto;
-    border-collapse: collapse;
-  }
-
-  th, td {
-    padding: 8px;
-    text-align: left;
-    border: 1px solid black;
-  }
-  
-  li {
-    padding: 4px;
-  }
-
-  body {
-    padding: 16px;
-  }
-</style>
-
-<link rel="stylesheet" href="asset/github-dark.min.css">
-
-<script src="asset/dark-reader.js"></script>
+<script src="asset/dark-reader.min.js"></script>
 <script src="asset/highlight.min.js"></script>
+<script src="asset/katex.min.js"></script>
+<script src="asset/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
 
 <script>
     DarkReader.enable({
@@ -116,6 +144,12 @@ func (bot *DeepBot) htmlToImage(content string) ([]byte, error) {
 	targetURL := fmt.Sprintf("http://%s/%s", listener.Addr(), randomName)
 
 	// start headless browser to render it
+	tempDir, err := os.MkdirTemp("", "chromedp-*")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
 	options := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
@@ -143,24 +177,13 @@ func (bot *DeepBot) htmlToImage(content string) ([]byte, error) {
 		chromedp.Flag("enable-automation", true),
 		chromedp.Flag("password-store", "basic"),
 		chromedp.Flag("use-mock-keychain", true),
+
+		chromedp.UserDataDir(tempDir),
 	}
 	cfg := bot.config.Render
 	if cfg.ExecPath != "" {
 		options = append(options, chromedp.ExecPath(cfg.ExecPath))
 	}
-	dataDir := cfg.DataDir
-	if dataDir == "" {
-		dataDir = defaultDataDir
-	}
-	dataDir, err = filepath.Abs(dataDir)
-	if err != nil {
-		return nil, err
-	}
-	err = os.MkdirAll(dataDir, 0755)
-	if err != nil {
-		return nil, err
-	}
-	options = append(options, chromedp.UserDataDir(dataDir))
 
 	ctx, cancel := chromedp.NewExecAllocator(context.Background(), options...)
 	defer cancel()

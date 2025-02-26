@@ -18,8 +18,6 @@ func init() {
 }
 
 func TestMarkdownToImage(t *testing.T) {
-	defer func() { _ = os.RemoveAll(defaultDataDir) }()
-
 	md, err := os.ReadFile("testdata/message.md")
 	require.NoError(t, err)
 
@@ -31,8 +29,6 @@ func TestMarkdownToImage(t *testing.T) {
 }
 
 func TestHTMLToImage(t *testing.T) {
-	defer func() { _ = os.RemoveAll(defaultDataDir) }()
-
 	data, err := os.ReadFile("testdata/message.html")
 	require.NoError(t, err)
 
@@ -44,8 +40,6 @@ func TestHTMLToImage(t *testing.T) {
 }
 
 func TestRenderHelpDocument(t *testing.T) {
-	defer func() { _ = os.RemoveAll(defaultDataDir) }()
-
 	output, err := testBot.markdownToImage(helpMD)
 	require.NoError(t, err)
 
