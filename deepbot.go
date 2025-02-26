@@ -48,8 +48,7 @@ type Config struct {
 		Width    int64  `toml:"width"`
 		Height   int64  `toml:"height"`
 		ExecPath string `toml:"exec_path"`
-		DataDir  string `toml:"data_dir"`
-	} `toml:"md_render"`
+	} `toml:"render"`
 
 	FetchURL struct {
 		Enabled  bool   `toml:"enabled"`
@@ -112,9 +111,10 @@ func NewDeepBot(config *Config) *DeepBot {
 		return false
 	}
 	zero.OnCommand("chat ", filter).SetBlock(true).Handle(bot.onChat)
-	zero.OnCommand("coder ", filter).SetBlock(true).Handle(bot.onCoder)
+	zero.OnCommand("chatx ", filter).SetBlock(true).Handle(bot.onChatX)
 	zero.OnCommand("ai ", filter).SetBlock(true).Handle(bot.onReasoner)
-	zero.OnCommand("air ", filter).SetBlock(true).Handle(bot.onReasoning)
+	zero.OnCommand("aix ", filter).SetBlock(true).Handle(bot.onReasoning)
+	zero.OnCommand("coder ", filter).SetBlock(true).Handle(bot.onCoder)
 	zero.OnCommand("deep.当前模型", filter).SetBlock(true).Handle(bot.onGetModel)
 	zero.OnCommand("deep.设置模型 ", filter).SetBlock(true).Handle(bot.onSetModel)
 	zero.OnCommand("deep.reset", filter).SetBlock(true).Handle(bot.onReset)
@@ -128,6 +128,8 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("deep.选择人设 ", filter).SetBlock(true).Handle(bot.onSetCharacter)
 	zero.OnCommand("deep.添加人设 ", filter).SetBlock(true).Handle(bot.onAddCharacter)
 	zero.OnCommand("deep.删除人设 ", filter).SetBlock(true).Handle(bot.onDelCharacter)
+	zero.OnCommand("deep.读取心情", filter).SetBlock(true).Handle(bot.onGetMood)
+	zero.OnCommand("deep.当前心情", filter).SetBlock(true).Handle(bot.onUpdateMood)
 	zero.OnCommand("help", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnCommand("deep.help", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnCommand("deep.帮助文档", filter).SetBlock(true).Handle(bot.onHelp)
@@ -171,23 +173,6 @@ var helpMD string
 
 func (bot *DeepBot) onHelp(ctx *zero.Ctx) {
 	bot.replyMessage(ctx, helpMD)
-}
-
-func (bot *DeepBot) onPoke(ctx *zero.Ctx) {
-	event := ctx.Event
-	if !event.IsToMe {
-		return
-	}
-	if event.NoticeType != "notify" || event.SubType != "poke" {
-		return
-	}
-
-	switch rand.IntN(2) {
-	case 0:
-		sendText(ctx, "别戳了")
-	case 1:
-		sendText(ctx, "再戳我就要爆了")
-	}
 }
 
 func (bot *DeepBot) replyMessage(ctx *zero.Ctx, msg string) {
