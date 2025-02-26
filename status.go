@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/cohesion-org/deepseek-go"
-	zero "github.com/wdvxdr1123/ZeroBot"
+	"github.com/wdvxdr1123/ZeroBot"
 )
 
 const promptGetMood = `
