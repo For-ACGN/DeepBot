@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"github.com/cohesion-org/deepseek-go"
+	zero "github.com/wdvxdr1123/ZeroBot"
 )
 
 const promptGetMood = `
@@ -25,6 +27,30 @@ var validMoods = map[string]struct{}{
 func isValidMood(mood string) bool {
 	_, ok := validMoods[mood]
 	return ok
+}
+
+func (bot *DeepBot) onGetMood(ctx *zero.Ctx) {
+	user := bot.getUser(ctx.Event.UserID)
+
+	mood := user.getMood()
+	if mood == "" {
+		mood = "平静"
+	}
+
+	bot.replyMessage(ctx, mood)
+}
+
+func (bot *DeepBot) onUpdateMood(ctx *zero.Ctx) {
+	user := bot.getUser(ctx.Event.UserID)
+
+	mood, err := bot.updateMood(user)
+	if err != nil {
+		log.Printf("failed to update mood: %s\n", err)
+		bot.replyMessage(ctx, "更新心情失败")
+		return
+	}
+
+	bot.replyMessage(ctx, mood)
 }
 
 func (bot *DeepBot) updateMood(user *user) (string, error) {

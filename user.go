@@ -28,6 +28,9 @@ type user struct {
 	// current model name
 	model string
 
+	// about character mood
+	mood string
+
 	// store data for tool call
 	ctx map[string]interface{}
 
@@ -92,7 +95,7 @@ func (user *user) setCharacter(content string) {
 func (user *user) getRounds() []*round {
 	user.rwm.Lock()
 	defer user.rwm.Unlock()
-	if time.Since(user.last) > 15*time.Minute {
+	if time.Since(user.last) > 30*time.Minute {
 		user.rounds = nil
 	}
 	user.last = time.Now()
@@ -116,6 +119,18 @@ func (user *user) setModel(model string) {
 	user.rwm.Lock()
 	defer user.rwm.Unlock()
 	user.model = model
+}
+
+func (user *user) getMood() string {
+	user.rwm.RLock()
+	defer user.rwm.RUnlock()
+	return user.mood
+}
+
+func (user *user) setMood(mood string) {
+	user.rwm.Lock()
+	defer user.rwm.Unlock()
+	user.mood = mood
 }
 
 func (user *user) getContext(key string) interface{} {
