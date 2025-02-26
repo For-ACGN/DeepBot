@@ -12,7 +12,6 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/cohesion-org/deepseek-go"
-	"github.com/cohesion-org/deepseek-go/constants"
 	"github.com/wdvxdr1123/ZeroBot"
 )
 
@@ -56,15 +55,15 @@ func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 	bot.replyMessage(ctx, resp.Answer)
 }
 
-func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
+func (bot *DeepBot) onChatX(ctx *zero.Ctx) {
 	msg := ctx.MessageString()
-	msg = strings.Replace(msg, "coder ", "", 1)
-	fmt.Println("coder", ctx.Event.GroupID, msg)
+	msg = strings.Replace(msg, "chatx ", "", 1)
+	fmt.Println("chatx", ctx.Event.GroupID, msg)
 	user := bot.getUser(ctx.Event.UserID)
 
 	req := &ChatRequest{
-		Model:       deepseek.DeepSeekCoder,
-		Temperature: 0,
+		Model:       deepseek.DeepSeekChat,
+		Temperature: 1.3,
 		MaxTokens:   8192,
 	}
 	resp, err := bot.chat(req, user, msg)
@@ -98,8 +97,8 @@ func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
 
 func (bot *DeepBot) onReasoning(ctx *zero.Ctx) {
 	msg := ctx.MessageString()
-	msg = strings.Replace(msg, "air ", "", 1)
-	fmt.Println("air", ctx.Event.GroupID, msg)
+	msg = strings.Replace(msg, "aix ", "", 1)
+	fmt.Println("aix", ctx.Event.GroupID, msg)
 	user := bot.getUser(ctx.Event.UserID)
 
 	req := &ChatRequest{
@@ -136,6 +135,26 @@ func (bot *DeepBot) onReasoning(ctx *zero.Ctx) {
 		return
 	}
 	sendImage(ctx, img)
+}
+
+func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
+	msg := ctx.MessageString()
+	msg = strings.Replace(msg, "coder ", "", 1)
+	fmt.Println("coder", ctx.Event.GroupID, msg)
+	user := bot.getUser(ctx.Event.UserID)
+
+	req := &ChatRequest{
+		Model:       deepseek.DeepSeekCoder,
+		Temperature: 0,
+		MaxTokens:   8192,
+	}
+	resp, err := bot.chat(req, user, msg)
+	if err != nil {
+		log.Printf("%s, failed to chat: %s\n", resp, err)
+		return
+	}
+
+	bot.replyMessage(ctx, resp.Answer)
 }
 
 func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
@@ -251,7 +270,7 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 	}
 	if character != "" {
 		messages = append(messages, ChatMessage{
-			Role:    constants.ChatMessageRoleSystem,
+			Role:    deepseek.ChatMessageRoleSystem,
 			Content: character,
 		})
 	}
@@ -274,7 +293,7 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 
 	// append user question
 	question := ChatMessage{
-		Role:    constants.ChatMessageRoleUser,
+		Role:    deepseek.ChatMessageRoleUser,
 		Content: msg,
 	}
 	messages = append(messages, question)
@@ -294,7 +313,7 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 	}
 	// process response
 	cm := resp.Choices[0].Message
-	if cm.Role != constants.ChatMessageRoleAssistant {
+	if cm.Role != deepseek.ChatMessageRoleAssistant {
 		return nil, errors.New("invalid message role: " + cm.Role)
 	}
 	content := cm.Content
@@ -302,7 +321,7 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 		return nil, errors.New("receive empty message content")
 	}
 	answer := ChatMessage{
-		Role:    constants.ChatMessageRoleAssistant,
+		Role:    deepseek.ChatMessageRoleAssistant,
 		Content: content,
 	}
 	rounds = append(rounds, &round{
@@ -314,6 +333,9 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 		Answer:    content,
 		Reasoning: cm.ReasoningContent,
 	}
+	fmt.Println("==================chat response=================")
+	fmt.Println(content)
+	fmt.Println("================================================")
 	return cr, nil
 }
 
@@ -326,7 +348,7 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 	fmt.Println("num calls:", numCalls)
 
 	question := ChatMessage{
-		Role:      constants.ChatMessageRoleAssistant,
+		Role:      deepseek.ChatMessageRoleAssistant,
 		ToolCalls: toolCalls,
 	}
 	var answers []ChatMessage
