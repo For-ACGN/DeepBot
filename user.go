@@ -18,6 +18,9 @@ type round struct {
 type user struct {
 	id int64
 
+	// current role name
+	role string
+
 	// current character content
 	character string
 
@@ -27,6 +30,9 @@ type user struct {
 
 	// current model name
 	model string
+
+	// global disable tool call
+	disableTC bool
 
 	// about character mood
 	mood string
@@ -65,19 +71,26 @@ func (user *user) initDir() error {
 }
 
 func (user *user) readCharacter() {
-	cfg, err := os.ReadFile(fmt.Sprintf("data/characters/%d/current.cfg", user.id))
+	role, err := os.ReadFile(fmt.Sprintf("data/characters/%d/current.cfg", user.id))
 	if err != nil {
 		return
 	}
-	if len(cfg) == 0 {
+	if len(role) == 0 {
 		return
 	}
-	char, err := os.ReadFile(fmt.Sprintf("data/characters/%d/%s.txt", user.id, cfg))
+	char, err := os.ReadFile(fmt.Sprintf("data/characters/%d/%s.txt", user.id, role))
 	if err != nil {
 		log.Println("[error] failed to read character file:", err)
 		return
 	}
+	user.role = string(role)
 	user.character = string(char)
+}
+
+func (user *user) getRole() string {
+	user.rwm.RLock()
+	defer user.rwm.RUnlock()
+	return user.role
 }
 
 func (user *user) getCharacter() string {
@@ -86,9 +99,10 @@ func (user *user) getCharacter() string {
 	return user.character
 }
 
-func (user *user) setCharacter(content string) {
+func (user *user) setCharacter(role, content string) {
 	user.rwm.Lock()
 	defer user.rwm.Unlock()
+	user.role = role
 	user.character = content
 }
 
@@ -119,6 +133,18 @@ func (user *user) setModel(model string) {
 	user.rwm.Lock()
 	defer user.rwm.Unlock()
 	user.model = model
+}
+
+func (user *user) canToolCall() bool {
+	user.rwm.RLock()
+	defer user.rwm.RUnlock()
+	return !user.disableTC
+}
+
+func (user *user) setToolCall(enabled bool) {
+	user.rwm.Lock()
+	defer user.rwm.Unlock()
+	user.disableTC = !enabled
 }
 
 func (user *user) getMood() string {
