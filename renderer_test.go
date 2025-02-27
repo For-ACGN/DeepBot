@@ -11,9 +11,9 @@ var testBot *DeepBot
 
 func init() {
 	cfg := &Config{}
-	cfg.Render.ExecPath = `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`
-	cfg.Render.Width = 600
-	cfg.Render.Height = 300
+	cfg.Renderer.ExecPath = chromePath
+	cfg.Renderer.Width = 600
+	cfg.Renderer.Height = 300
 	testBot = NewDeepBot(cfg)
 }
 
@@ -39,7 +39,7 @@ func TestHTMLToImage(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRenderHelpDocument(t *testing.T) {
+func TestRendererHelpDocument(t *testing.T) {
 	output, err := testBot.markdownToImage(helpMD)
 	require.NoError(t, err)
 

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -16,111 +17,17 @@ import (
 //go:embed asset
 var asset embed.FS
 
+//go:embed template/renderer.html
+var renderer string
+
 func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
 	output := markdownToHTML(md)
 	return bot.htmlToImage(output)
 }
 
 func (bot *DeepBot) htmlToImage(content string) ([]byte, error) {
-	// insert code about js and css for render code block
-	document := `
-<!DOCTYPE html>
-<html>
-
-<head>
-  <meta charset="UTF-8">
-
-  <link rel="stylesheet" href="asset/github-dark.min.css">
-  <link rel="stylesheet" href="asset/katex.min.css">
-
-  <style>
-    @font-face {
-        font-family: 'Noto Sans SC';
-        src: url('asset/font/NotoSansSC-VariableFont_wght.ttf') format('truetype');
-        font-style: normal;
-    }
-
-    @font-face {
-        font-family: 'Roboto Mono';
-        src: url('asset/font/RobotoMono-VariableFont_wght.ttf') format('truetype');
-        font-style: normal;
-    }
-
-    @font-face {
-        font-family: 'NotoColorEmoji';
-        src: url('asset/font/NotoColorEmoji-Regular.ttf') format('truetype');
-        font-style: normal;
-    }
-
-    * {
-      font-family: 'Noto Sans SC', 'NotoColorEmoji';
-    }
-
-    pre {
-      max-width: 100%%;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-
-    code {
-      font-family: 'Roboto Mono', 'Noto Sans SC', 'NotoColorEmoji';
-      background: #3C3D3E;
-      padding: 3px;
-      border-radius: 4px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-
-    table {
-      table-layout: auto;
-      border-collapse: collapse;
-    }
-
-    th, td {
-      padding: 8px;
-      text-align: left;
-      border: 1px solid black;
-    }
-
-    li {
-      padding: 4px;
-    }
-
-    tr:nth-child(even) {
-      background-color: #1D1F20;
-    }
-
-    tr:nth-child(odd) {
-      background-color: #262C36;
-    }
-
-    body {
-      padding: 16px;
-    }
-  </style>
-</head>
-
-<body>
-%s
-</body>
-
-<script src="asset/dark-reader.min.js"></script>
-<script src="asset/highlight.min.js"></script>
-<script src="asset/katex.min.js"></script>
-<script src="asset/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
-
-<script>
-    DarkReader.enable({
-        brightness: 100,
-        contrast:   95,
-        sepia:      0
-    });
-    hljs.highlightAll();
-</script>
-
-</html>`
-	document = fmt.Sprintf(document, content)
+	// insert code about js and css for renderer code block
+	document := strings.ReplaceAll(renderer, "{{data}}", content)
 	fmt.Println(document)
 
 	// deploy a http server for headless browser
@@ -143,7 +50,7 @@ func (bot *DeepBot) htmlToImage(content string) ([]byte, error) {
 	defer func() { _ = server.Close() }()
 	targetURL := fmt.Sprintf("http://%s/%s", listener.Addr(), randomName)
 
-	// start headless browser to render it
+	// start headless browser to renderer it
 	tempDir, err := os.MkdirTemp("", "chromedp-*")
 	if err != nil {
 		return nil, err
@@ -180,7 +87,7 @@ func (bot *DeepBot) htmlToImage(content string) ([]byte, error) {
 
 		chromedp.UserDataDir(tempDir),
 	}
-	cfg := bot.config.Render
+	cfg := bot.config.Renderer
 	if cfg.ExecPath != "" {
 		options = append(options, chromedp.ExecPath(cfg.ExecPath))
 	}
