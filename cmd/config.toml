@@ -1,27 +1,29 @@
-group_id = [123456, 1234567]
+group_id = [1234, 5678]
 
 [deepseek]
-  api_key  = ""
+  api_key  = "<YOUR_API_KEY>"
   base_url = "https://api.deepseek.com/"
   timeout  = 180000 # millisecond
 
 [onebot]
   [onebot.ws_client]
     enabled = true
-    url     = "ws://192.168.1.2:3001/"
+    url     = "ws://127.0.0.1:3001/"
     token   = ""
 
   [onebot.ws_server]
     enabled = false
     url     = "ws://0.0.0.0:3001/"
-    token   = "admin"
+    token   = ""
 
-[md_render]
+[renderer]
   enabled   = true
   width     = 600
-  height    = 900
+  height    = 200
   exec_path = "" # custom chromium kernel browser
-  data_dir  = ""
+
+[emoticon]
+  rate = 10 # 0-100%
 
 [fetch_url]
   enabled   = true
