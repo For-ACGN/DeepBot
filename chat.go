@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -52,7 +52,7 @@ func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, resp.Answer)
+	bot.replyMessage(ctx, user, resp.Answer)
 }
 
 func (bot *DeepBot) onChatX(ctx *zero.Ctx) {
@@ -72,7 +72,7 @@ func (bot *DeepBot) onChatX(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, resp.Answer)
+	bot.replyMessage(ctx, user, resp.Answer)
 }
 
 func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
@@ -92,7 +92,7 @@ func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, resp.Answer)
+	bot.replyMessage(ctx, user, resp.Answer)
 }
 
 func (bot *DeepBot) onReasoning(ctx *zero.Ctx) {
@@ -154,7 +154,7 @@ func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, resp.Answer)
+	bot.replyMessage(ctx, user, resp.Answer)
 }
 
 func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
@@ -178,7 +178,7 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 	case deepseek.DeepSeekReasoner:
 		req.Temperature = 1.2
 	default:
-		bot.replyMessage(ctx, "非法模型名称")
+		bot.replyResponse(ctx, "非法模型名称")
 		return
 	}
 	resp, err := bot.chat(req, user, msg)
@@ -187,20 +187,20 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, resp.Answer)
+	bot.replyMessage(ctx, user, resp.Answer)
 }
 
 func (bot *DeepBot) onGetModel(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 	model := user.getModel()
 
-	bot.replyMessage(ctx, "当前模型: "+model)
+	bot.replyResponse(ctx, "当前模型: "+model)
 }
 
 func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
 	msg := textToArgN(ctx.MessageString(), 2)
 	if len(msg) != 2 {
-		bot.replyMessage(ctx, "非法参数格式")
+		bot.replyResponse(ctx, "非法参数格式")
 		return
 	}
 
@@ -215,24 +215,69 @@ func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
 	case "8b":
 		model = "deepseek-r1:8b" // 联合测试使用
 	default:
-		bot.replyMessage(ctx, "非法模型名称")
+		bot.replyResponse(ctx, "非法模型名称")
 		return
 	}
 
 	user := bot.getUser(ctx.Event.UserID)
 	user.setModel(model)
 
-	bot.replyMessage(ctx, "设置模型成功")
+	bot.replyResponse(ctx, "设置模型成功")
+}
+
+func (bot *DeepBot) onEnableToolCall(ctx *zero.Ctx) {
+	user := bot.getUser(ctx.Event.UserID)
+	user.setToolCall(true)
+
+	bot.replyResponse(ctx, "全局启用函数")
+}
+
+func (bot *DeepBot) onDisableToolCall(ctx *zero.Ctx) {
+	user := bot.getUser(ctx.Event.UserID)
+	user.setToolCall(false)
+
+	bot.replyResponse(ctx, "全局禁用函数")
 }
 
 func (bot *DeepBot) onReset(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 	user.setRounds(nil)
 
-	bot.replyMessage(ctx, "重置会话成功")
+	bot.replyResponse(ctx, "重置会话成功")
+}
+
+func (bot *DeepBot) onPoke(ctx *zero.Ctx) {
+	event := ctx.Event
+	if !event.IsToMe {
+		return
+	}
+	if event.NoticeType != "notify" || event.SubType != "poke" {
+		return
+	}
+
+	switch rand.IntN(8) {
+	case 0:
+		bot.replyResponse(ctx, "?")
+	case 1:
+		bot.replyResponse(ctx, "??")
+	case 2:
+		bot.replyResponse(ctx, "???")
+	case 3:
+		bot.replyResponse(ctx, "¿¿¿")
+	case 4:
+		bot.replyResponse(ctx, "别戳了")
+	case 5:
+		bot.replyResponse(ctx, "再戳我就要爆了")
+	default:
+		bot.replyEmoticon(ctx, nil)
+	}
 }
 
 func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (*chatResp, error) {
+	if !user.canToolCall() {
+		req.Tools = nil
+		req.ToolChoice = nil
+	}
 	var err error
 	for i := 0; i < 3; i++ {
 		var resp *chatResp
@@ -265,8 +310,8 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 	var messages []ChatMessage
 	// build and append system prompt
 	character := user.getCharacter()
-	if req.Model != deepseek.DeepSeekReasoner && len(bot.tools) > 1 {
-		character += "\n" + promptToolCall
+	if len(req.Tools) > 0 && req.Model != deepseek.DeepSeekReasoner {
+		character += "\n\n" + promptToolCall
 	}
 	if character != "" {
 		messages = append(messages, ChatMessage{
@@ -492,32 +537,32 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall, user *user) (string, 
 // case "GetRelativeHumidity":
 // 	answer = "当前相对湿度是: 32%"
 
-func chatStream(client *deepseek.Client, request *deepseek.StreamChatCompletionRequest) (string, error) {
-	stream, err := client.CreateChatCompletionStream(context.Background(), request)
-	if err != nil {
-		return "", fmt.Errorf("failed to create chat completion stream: %s", err)
-	}
-	defer func() { _ = stream.Close() }()
-	var response string
-	for {
-		var resp *deepseek.StreamChatCompletionResponse
-		resp, err = stream.Recv()
-		if err == io.EOF {
-			err = nil
-			break
-		}
-		if err != nil {
-			err = fmt.Errorf("failed to receive chat completion response: %s", err)
-			break
-		}
-		for _, choice := range resp.Choices {
-			response += choice.Delta.Content
+// func chatStream(client *deepseek.Client, request *deepseek.StreamChatCompletionRequest) (string, error) {
+// 	stream, err := client.CreateChatCompletionStream(context.Background(), request)
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to create chat completion stream: %s", err)
+// 	}
+// 	defer func() { _ = stream.Close() }()
+// 	var response string
+// 	for {
+// 		var resp *deepseek.StreamChatCompletionResponse
+// 		resp, err = stream.Recv()
+// 		if err == io.EOF {
+// 			err = nil
+// 			break
+// 		}
+// 		if err != nil {
+// 			err = fmt.Errorf("failed to receive chat completion response: %s", err)
+// 			break
+// 		}
+// 		for _, choice := range resp.Choices {
+// 			response += choice.Delta.Content
 
-			fmt.Print(choice.Delta.Content)
-		}
-	}
-	if response == "" {
-		return "", errors.New("receive empty response")
-	}
-	return response, err
-}
+// 			fmt.Print(choice.Delta.Content)
+// 		}
+// 	}
+// 	if response == "" {
+// 		return "", errors.New("receive empty response")
+// 	}
+// 	return response, err
+//
