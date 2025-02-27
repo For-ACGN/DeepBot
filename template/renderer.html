@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+  <meta charset="UTF-8">
+
+  <title>renderer</title>
+
+  <link rel="stylesheet" href="asset/github-dark.min.css">
+  <link rel="stylesheet" href="asset/katex.min.css">
+
+  <style>
+      @font-face {
+          font-family: 'Noto Sans SC';
+          src: url('asset/font/NotoSansSC-VariableFont_wght.ttf') format('truetype');
+          font-style: normal;
+      }
+
+      @font-face {
+          font-family: 'Roboto Mono';
+          src: url('asset/font/RobotoMono-VariableFont_wght.ttf') format('truetype');
+          font-style: normal;
+      }
+
+      @font-face {
+          font-family: 'NotoColorEmoji';
+          src: url('asset/font/NotoColorEmoji-Regular.ttf') format('truetype');
+          font-style: normal;
+      }
+
+      * {
+          font-family: 'Noto Sans SC', 'NotoColorEmoji', system-ui;
+      }
+
+      pre {
+          max-width: 100%;
+          overflow-x: auto;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+      }
+
+      code {
+          font-family: 'Roboto Mono', 'Noto Sans SC', 'NotoColorEmoji', monospace;
+          background: #3C3D3E;
+          padding: 3px;
+          border-radius: 4px;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+      }
+
+      table {
+          table-layout: auto;
+          border-collapse: collapse;
+      }
+
+      th, td {
+          padding: 8px;
+          text-align: left;
+          border: 1px solid black;
+      }
+
+      li {
+          padding: 4px;
+      }
+
+      tr:nth-child(even) {
+          background-color: #1D1F20;
+      }
+
+      tr:nth-child(odd) {
+          background-color: #262C36;
+      }
+
+      body {
+          padding: 16px;
+      }
+  </style>
+
+</head>
+
+<body>
+  {{data}}
+</body>
+
+<script src="asset/dark-reader.min.js"></script>
+<script src="asset/highlight.min.js"></script>
+<script src="asset/katex.min.js"></script>
+<script src="asset/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
+
+<script>
+    DarkReader.enable({
+        brightness: 100,
+        contrast:   95,
+        sepia:      0
+    });
+    hljs.highlightAll();
+</script>
+
+</html>
