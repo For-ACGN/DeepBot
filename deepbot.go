@@ -2,8 +2,10 @@ package deepbot
 
 import (
 	"embed"
+	"fmt"
 	"log"
 	"math/rand/v2"
+	"os"
 	"sync"
 	"time"
 
@@ -43,12 +45,16 @@ type Config struct {
 		} `toml:"ws_server"`
 	} `toml:"onebot"`
 
-	Render struct {
+	Renderer struct {
 		Enabled  bool   `toml:"enabled"`
 		Width    int64  `toml:"width"`
 		Height   int64  `toml:"height"`
 		ExecPath string `toml:"exec_path"`
-	} `toml:"render"`
+	} `toml:"renderer"`
+
+	Emoticon struct {
+		Rate int `toml:"rate"`
+	} `toml:"emoticon"`
 
 	FetchURL struct {
 		Enabled  bool   `toml:"enabled"`
@@ -117,6 +123,8 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("coder ", filter).SetBlock(true).Handle(bot.onCoder)
 	zero.OnCommand("deep.当前模型", filter).SetBlock(true).Handle(bot.onGetModel)
 	zero.OnCommand("deep.设置模型 ", filter).SetBlock(true).Handle(bot.onSetModel)
+	zero.OnCommand("deep.启用函数", filter).SetBlock(true).Handle(bot.onEnableToolCall)
+	zero.OnCommand("deep.禁用函数", filter).SetBlock(true).Handle(bot.onDisableToolCall)
 	zero.OnCommand("deep.reset", filter).SetBlock(true).Handle(bot.onReset)
 	zero.OnCommand("deep.重置", filter).SetBlock(true).Handle(bot.onReset)
 	zero.OnCommand("deep.重置会话", filter).SetBlock(true).Handle(bot.onReset)
@@ -168,15 +176,17 @@ func (bot *DeepBot) getUser(uid int64) *user {
 	return user
 }
 
-//go:embed help.md
+//go:embed template/help.md
 var helpMD string
 
 func (bot *DeepBot) onHelp(ctx *zero.Ctx) {
-	bot.replyMessage(ctx, helpMD)
+	bot.replyMessage(ctx, nil, helpMD)
 }
 
-func (bot *DeepBot) replyMessage(ctx *zero.Ctx, msg string) {
-	if !bot.config.Render.Enabled {
+// process command about chat.
+func (bot *DeepBot) replyMessage(ctx *zero.Ctx, user *user, msg string) {
+	defer bot.postProcess(ctx, user, msg)
+	if !bot.config.Renderer.Enabled {
 		sendText(ctx, msg)
 		return
 	}
@@ -196,6 +206,24 @@ func (bot *DeepBot) replyMessage(ctx *zero.Ctx, msg string) {
 	img, err := bot.htmlToImage(msg)
 	if err != nil {
 		log.Println(err)
+		return
+	}
+	sendImage(ctx, img)
+}
+
+// process command about get status.
+func (bot *DeepBot) replyResponse(ctx *zero.Ctx, msg string) {
+	sendText(ctx, msg)
+}
+
+func (bot *DeepBot) replyImage(ctx *zero.Ctx, path string) {
+	fmt.Println("===============reply image==============")
+	fmt.Println(path)
+	fmt.Println("========================================")
+
+	img, err := os.ReadFile(path)
+	if err != nil {
+		log.Println("failed to load image:", err)
 		return
 	}
 	sendImage(ctx, img)
