@@ -15,7 +15,7 @@ func TestOnFetchURL(t *testing.T) {
 	defer cancel()
 
 	opts := []chromedp.ExecAllocatorOption{
-		chromedp.ExecPath(`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`),
+		chromedp.ExecPath(chromePath),
 	}
 	output, err := onFetchURL(ctx, opts, "https://www.baidu.com/")
 	require.NoError(t, err)
