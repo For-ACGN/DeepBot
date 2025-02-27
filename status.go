@@ -37,7 +37,7 @@ func (bot *DeepBot) onGetMood(ctx *zero.Ctx) {
 		mood = "平静"
 	}
 
-	bot.replyMessage(ctx, mood)
+	bot.replyResponse(ctx, mood)
 }
 
 func (bot *DeepBot) onUpdateMood(ctx *zero.Ctx) {
@@ -46,11 +46,11 @@ func (bot *DeepBot) onUpdateMood(ctx *zero.Ctx) {
 	mood, err := bot.updateMood(user)
 	if err != nil {
 		log.Printf("failed to update mood: %s\n", err)
-		bot.replyMessage(ctx, "更新心情失败")
+		bot.replyResponse(ctx, "更新心情失败")
 		return
 	}
 
-	bot.replyMessage(ctx, mood)
+	bot.replyResponse(ctx, mood)
 }
 
 func (bot *DeepBot) updateMood(user *user) (string, error) {
