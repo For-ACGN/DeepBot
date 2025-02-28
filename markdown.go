@@ -18,27 +18,27 @@ type mdDetector struct {
 }
 
 type mdRule struct {
+	name    string
 	pattern *regexp.Regexp
 	weight  float64
-	name    string
 }
 
 func newMDDetector() *mdDetector {
 	features := []mdRule{
 		// 标题: # 后跟空格和文本
-		{regexp.MustCompile(`(?m)^#{1,6}\s+.+$`), 2.0, "header"},
+		{"header", regexp.MustCompile(`(?m)^#{1,6}\s+.+$`), 2.0},
 		// 列表项: */-/数字. 后跟空格
-		{regexp.MustCompile(`(?m)^(\*|-|\d+\.)\s+`), 1.0, "list"},
+		{"list", regexp.MustCompile(`(?m)^(\*|-|\d+\.)\s+`), 1.0},
 		// 链接/图片
-		{regexp.MustCompile(`\[.*?\]\(.+?\)`), 2.0, "link"},
+		{"link", regexp.MustCompile(`\[.*?\]\(.+?\)`), 2.0},
 		// 粗体/斜体
-		{regexp.MustCompile(`(\*\*.*?\*\*|\*.*?\*)`), 1.0, "emphasis"},
+		{"emphasis", regexp.MustCompile(`(\*\*.*?\*\*|\*.*?\*)`), 1.0},
 		// 引用块
-		{regexp.MustCompile(`(?m)^>\s+`), 1.0, "blockquote"},
+		{"blockquote", regexp.MustCompile(`(?m)^>\s+`), 1.0},
 		// 水平线
-		{regexp.MustCompile(`(?m)^-{3,}$|^_{3,}$|^\*{3,}$`), 1.0, "hr"},
+		{"hr", regexp.MustCompile(`(?m)^-{3,}$|^_{3,}$|^\*{3,}$`), 1.0},
 		// 表格
-		{regexp.MustCompile(`(?m)^\|.*\|$`), 3.0, "table"},
+		{"table", regexp.MustCompile(`(?m)^\|.*\|$`), 3.0},
 	}
 	return &mdDetector{features: features}
 }
@@ -93,6 +93,8 @@ func (md *mdDetector) normalizeScore(score float64) float64 {
 	}
 	return probability
 }
+
+// ====================================================================================
 
 func isMarkdown(text string) bool {
 	if strings.Count(text, "```") >= 2 {
