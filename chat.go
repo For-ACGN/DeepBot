@@ -10,19 +10,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chromedp/chromedp"
 	"github.com/cohesion-org/deepseek-go"
 	"github.com/wdvxdr1123/ZeroBot"
 )
 
+const maxToolCallLen = 128 * 1024
+
 const promptToolCall = `
 [外部函数调用指南]
-   你可以使用浏览器来访问原先你访问不到的外部资源，具体请使用FetchURL工具函数。
+   你可以使用浏览器来访问原先你访问不到的外部资源，具体请使用BrowseURL工具函数。
    你可以生成并且执行Go语言代码，来访问原先你访问不到的外部资源，具体请使用EvalGo工具函数。
-   请注意如果你只是需要浏览网页，请优先使用FetchURL，而不是生成相关代码使用EvalGo来访问。
+   请注意如果你只是需要浏览网页，请优先使用BrowseURL，而不是生成相关代码使用EvalGo来访问。
    一般来说，不要重复地访问同一个URL，以及不要递归访问网站内容中的出现URL。
-   一般来说，仅当你需要访问实时信息时才应该使用FetchURL工具函数。
-   禁止多次来回调用FetchURL工具函数，一轮对话中只允许使用一次FetchURL。
+   一般来说，仅当你需要访问实时信息时才应该使用BrowseURL工具函数。
+   禁止多次来回调用BrowseURL工具函数，一轮对话中只允许使用一次BrowseURL。
 `
 
 type chatResp struct {
@@ -52,7 +53,7 @@ func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, user, resp.Answer)
+	bot.reply(ctx, user, resp.Answer)
 }
 
 func (bot *DeepBot) onChatX(ctx *zero.Ctx) {
@@ -72,7 +73,7 @@ func (bot *DeepBot) onChatX(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, user, resp.Answer)
+	bot.reply(ctx, user, resp.Answer)
 }
 
 func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
@@ -92,7 +93,7 @@ func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, user, resp.Answer)
+	bot.reply(ctx, user, resp.Answer)
 }
 
 func (bot *DeepBot) onReasoning(ctx *zero.Ctx) {
@@ -154,7 +155,7 @@ func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, user, resp.Answer)
+	bot.reply(ctx, user, resp.Answer)
 }
 
 func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
@@ -178,7 +179,7 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 	case deepseek.DeepSeekReasoner:
 		req.Temperature = 1.2
 	default:
-		bot.replyResponse(ctx, "非法模型名称")
+		bot.sendText(ctx, "非法模型名称")
 		return
 	}
 	resp, err := bot.chat(req, user, msg)
@@ -187,20 +188,20 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 		return
 	}
 
-	bot.replyMessage(ctx, user, resp.Answer)
+	bot.reply(ctx, user, resp.Answer)
 }
 
 func (bot *DeepBot) onGetModel(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 	model := user.getModel()
 
-	bot.replyResponse(ctx, "当前模型: "+model)
+	bot.sendText(ctx, "当前模型: "+model)
 }
 
 func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
 	msg := textToArgN(ctx.MessageString(), 2)
 	if len(msg) != 2 {
-		bot.replyResponse(ctx, "非法参数格式")
+		bot.sendText(ctx, "非法参数格式")
 		return
 	}
 
@@ -215,35 +216,35 @@ func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
 	case "8b":
 		model = "deepseek-r1:8b" // 联合测试使用
 	default:
-		bot.replyResponse(ctx, "非法模型名称")
+		bot.sendText(ctx, "非法模型名称")
 		return
 	}
 
 	user := bot.getUser(ctx.Event.UserID)
 	user.setModel(model)
 
-	bot.replyResponse(ctx, "设置模型成功")
+	bot.sendText(ctx, "设置模型成功")
 }
 
 func (bot *DeepBot) onEnableToolCall(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 	user.setToolCall(true)
 
-	bot.replyResponse(ctx, "全局启用函数")
+	bot.sendText(ctx, "全局启用函数")
 }
 
 func (bot *DeepBot) onDisableToolCall(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 	user.setToolCall(false)
 
-	bot.replyResponse(ctx, "全局禁用函数")
+	bot.sendText(ctx, "全局禁用函数")
 }
 
 func (bot *DeepBot) onReset(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 	user.setRounds(nil)
 
-	bot.replyResponse(ctx, "重置会话成功")
+	bot.sendText(ctx, "重置会话成功")
 }
 
 func (bot *DeepBot) onPoke(ctx *zero.Ctx) {
@@ -257,17 +258,17 @@ func (bot *DeepBot) onPoke(ctx *zero.Ctx) {
 
 	switch rand.IntN(8) {
 	case 0:
-		bot.replyResponse(ctx, "?")
+		bot.sendText(ctx, "?")
 	case 1:
-		bot.replyResponse(ctx, "??")
+		bot.sendText(ctx, "??")
 	case 2:
-		bot.replyResponse(ctx, "???")
+		bot.sendText(ctx, "???")
 	case 3:
-		bot.replyResponse(ctx, "¿¿¿")
+		bot.sendText(ctx, "¿¿¿")
 	case 4:
-		bot.replyResponse(ctx, "别戳了")
+		bot.sendText(ctx, "别戳了")
 	case 5:
-		bot.replyResponse(ctx, "再戳我就要爆了")
+		bot.sendText(ctx, "再戳我就要爆了")
 	default:
 		bot.replyEmoticon(ctx, nil)
 	}
@@ -349,9 +350,7 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 		return nil, fmt.Errorf("failed to create chat completion: %s", err)
 	}
 	// reset usage counter before process tool calls
-	user.setContext(usageGetTime, 0)
-	user.setContext(usageFetchURL, 0)
-	user.setContext(usageEvalGo, 0)
+	resetToolLimit(user)
 	resp, err = bot.doToolCalls(req, resp, user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process tool call: %s", err)
@@ -403,6 +402,9 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 		if err != nil {
 			return nil, err
 		}
+		if len(answer) > maxToolCallLen {
+			answer = answer[:maxToolCallLen]
+		}
 		answers = append(answers, ChatMessage{
 			Role:       "tool",
 			Content:    answer,
@@ -410,20 +412,6 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 		})
 		fmt.Println(answer)
 	}
-
-	// 只允许使用一次 FetchURL
-	// tools := bot.tools
-	// fmt.Println(tools)
-	// for i := 0; i < numCalls; i++ {
-	// 	if toolCalls[i].Function.Name == fnFetchURL {
-	// 		for j := 0; j < len(tools); j++ {
-	// 			if tools[j].Function.Name == fnFetchURL {
-	// 				tools = append(tools[:j], tools[j+1:]...)
-	// 			}
-	// 		}
-	// 		fmt.Println(tools)
-	// 	}
-	// }
 
 	messages := req.Messages
 	messages = append(messages, question)
@@ -433,7 +421,7 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 		Messages:    messages,
 		Temperature: 1.3,
 		MaxTokens:   8192,
-		// Tools:       tools,
+		// Tools:       updateTools(user, req.Tools),
 	}
 	resp, err := bot.client.CreateChatCompletion(context.Background(), toolReq)
 	if err != nil {
@@ -463,55 +451,45 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall, user *user) (string, 
 	var answer string
 	switch fnName {
 	case fnGetTime:
-		usage := user.getContext(usageGetTime).(int) + 1
-		if usage >= 5 {
-			return "", fmt.Errorf("too many calls about %s", fnGetTime)
-		}
-		user.setContext(usageGetTime, usage)
-
-		answer = onGetTime()
-	case fnFetchURL:
-		usage := user.getContext(usageFetchURL).(int) + 1
-		if usage >= 3 {
-			return "", fmt.Errorf("too many calls about %s", fnFetchURL)
-		}
-		user.setContext(usageFetchURL, usage)
-
-		args := struct {
-			URL string `json:"url"`
-		}{}
-		err := decoder.Decode(&args)
+		err := checkToolLimit(user, fnGetTime)
 		if err != nil {
 			return "", err
 		}
 
-		timeout := time.Duration(bot.config.FetchURL.Timeout) * time.Millisecond
+		answer = onGetTime()
+	case fnBrowseURL:
+		err := checkToolLimit(user, fnBrowseURL)
+		if err != nil {
+			return "", err
+		}
+
+		args := struct {
+			URL string `json:"url"`
+		}{}
+		err = decoder.Decode(&args)
+		if err != nil {
+			return "", err
+		}
+
+		timeout := time.Duration(bot.config.Browser.Timeout) * time.Millisecond
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
-		var options []chromedp.ExecAllocatorOption
-		cfg := bot.config.FetchURL
-		if cfg.ProxyURL != "" {
-			options = append(options, chromedp.ProxyServer(cfg.ProxyURL))
-		}
-		if cfg.ExecPath != "" {
-			options = append(options, chromedp.ExecPath(cfg.ExecPath))
-		}
-		output, err := onFetchURL(ctx, options, args.URL)
+		options := bot.getChromedpOptions()
+		output, err := onBrowseURL(ctx, options, args.URL)
 		if err != nil {
 			return "Chromedp Error: " + err.Error(), nil
 		}
 		answer = output
 	case fnEvalGo:
-		usage := user.getContext(usageEvalGo).(int) + 1
-		if usage >= 5 {
-			return "", fmt.Errorf("too many calls about %s", fnEvalGo)
+		err := checkToolLimit(user, fnEvalGo)
+		if err != nil {
+			return "", err
 		}
-		user.setContext(usageEvalGo, usage)
 
 		args := struct {
 			Src string `json:"src"`
 		}{}
-		err := decoder.Decode(&args)
+		err = decoder.Decode(&args)
 		if err != nil {
 			return "", err
 		}
@@ -528,6 +506,43 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall, user *user) (string, 
 		return "", fmt.Errorf("unknown function: %s", fnName)
 	}
 	return answer, nil
+}
+
+func resetToolLimit(user *user) {
+	for _, tool := range toolList {
+		user.setContext("Usage_"+tool.Name, 0)
+	}
+}
+
+func checkToolLimit(user *user, name string) error {
+	tool := toolList[name]
+	key := "Usage_" + tool.Name
+	usage := user.getContext(key).(int)
+	if usage >= tool.Limit {
+		return fmt.Errorf("too many calls about %s", tool.Name)
+	}
+	user.setContext(key, usage+1)
+	return nil
+}
+
+func reachToolLimit(user *user, name string) bool {
+	tool := toolList[name]
+	key := "Usage_" + tool.Name
+	usage := user.getContext(key).(int)
+	if usage >= tool.Limit {
+		return true
+	}
+	return false
+}
+
+func updateTools(user *user, tools []deepseek.Tool) []deepseek.Tool {
+	var result []deepseek.Tool
+	for _, tool := range tools {
+		if !reachToolLimit(user, tool.Function.Name) {
+			result = append(result, tool)
+		}
+	}
+	return result
 }
 
 // case "GetLocation":
