@@ -4,11 +4,11 @@ go 1.23.4
 
 require (
 	github.com/chromedp/chromedp v0.13.0
-	github.com/cohesion-org/deepseek-go v1.2.3
+	github.com/cohesion-org/deepseek-go v1.2.4
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/stretchr/testify v1.10.0
 	github.com/traefik/yaegi v0.16.1
-	github.com/wdvxdr1123/ZeroBot v1.8.0
+	github.com/wdvxdr1123/ZeroBot v1.8.1
 
 	github.com/gomarkdown/markdown v0.0.0-20250207164621-7a1f277a159e
 )
