@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOnFetchURL(t *testing.T) {
+func TestOnBrowseURL(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.ExecPath(chromePath),
 	}
-	output, err := onFetchURL(ctx, opts, "https://www.baidu.com/")
+	output, err := onBrowseURL(ctx, opts, "https://www.baidu.com/")
 	require.NoError(t, err)
 	fmt.Println(output)
 }
