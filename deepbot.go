@@ -6,9 +6,11 @@ import (
 	"log"
 	"math/rand/v2"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/chromedp/chromedp"
 	"github.com/cohesion-org/deepseek-go"
 	"github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/driver"
@@ -45,23 +47,26 @@ type Config struct {
 		} `toml:"ws_server"`
 	} `toml:"onebot"`
 
-	Renderer struct {
-		Enabled  bool   `toml:"enabled"`
-		Width    int64  `toml:"width"`
-		Height   int64  `toml:"height"`
+	Chromedp struct {
 		ExecPath string `toml:"exec_path"`
+		ProxyURL string `toml:"proxy_url"`
+	} `toml:"chromedp"`
+
+	Renderer struct {
+		Enabled bool  `toml:"enabled"`
+		Width   int64 `toml:"width"`
+		Height  int64 `toml:"height"`
+		Timeout int   `toml:"timeout"`
 	} `toml:"renderer"`
 
 	Emoticon struct {
 		Rate int `toml:"rate"`
 	} `toml:"emoticon"`
 
-	FetchURL struct {
-		Enabled  bool   `toml:"enabled"`
-		Timeout  int    `toml:"timeout"`
-		ProxyURL string `toml:"proxy_url"`
-		ExecPath string `toml:"exec_path"`
-	} `toml:"fetch_url"`
+	Browser struct {
+		Enabled bool `toml:"enabled"`
+		Timeout int  `toml:"timeout"`
+	} `toml:"browser"`
 
 	EvalGo struct {
 		Enabled bool `toml:"enabled"`
@@ -91,8 +96,8 @@ func NewDeepBot(config *Config) *DeepBot {
 	// build tools from config
 	var tools []deepseek.Tool
 	tools = append(tools, toolGetTime)
-	if config.FetchURL.Enabled {
-		tools = append(tools, toolFetchURL)
+	if config.Browser.Enabled {
+		tools = append(tools, toolBrowseURL)
 	}
 	if config.EvalGo.Enabled {
 		tools = append(tools, toolEvalGo)
@@ -165,6 +170,18 @@ func (bot *DeepBot) Run() {
 	zero.RunAndBlock(&cfg, nil)
 }
 
+func (bot *DeepBot) getChromedpOptions() []chromedp.ExecAllocatorOption {
+	var options []chromedp.ExecAllocatorOption
+	cfg := bot.config.Chromedp
+	if cfg.ExecPath != "" {
+		options = append(options, chromedp.ExecPath(cfg.ExecPath))
+	}
+	if cfg.ProxyURL != "" {
+		options = append(options, chromedp.ProxyServer(cfg.ProxyURL))
+	}
+	return options
+}
+
 func (bot *DeepBot) getUser(uid int64) *user {
 	bot.usersMu.Lock()
 	defer bot.usersMu.Unlock()
@@ -180,11 +197,11 @@ func (bot *DeepBot) getUser(uid int64) *user {
 var helpMD string
 
 func (bot *DeepBot) onHelp(ctx *zero.Ctx) {
-	bot.replyMessage(ctx, nil, helpMD)
+	bot.reply(ctx, nil, helpMD)
 }
 
 // process command about chat.
-func (bot *DeepBot) replyMessage(ctx *zero.Ctx, user *user, msg string) {
+func (bot *DeepBot) reply(ctx *zero.Ctx, user *user, msg string) {
 	defer bot.postProcess(ctx, user, msg)
 	if !bot.config.Renderer.Enabled {
 		sendText(ctx, msg)
@@ -199,10 +216,25 @@ func (bot *DeepBot) replyMessage(ctx *zero.Ctx, user *user, msg string) {
 		sendImage(ctx, img)
 		return
 	}
-	if len(msg) < 2048 {
+	bot.sendText(ctx, msg)
+}
+
+// process command about get status.
+func (bot *DeepBot) sendText(ctx *zero.Ctx, msg string) {
+	if len(msg) < 1024 {
 		sendText(ctx, msg)
 		return
 	}
+	// renderer long text to image
+	sections := strings.Split(msg, "\n")
+	builder := strings.Builder{}
+	builder.Grow(len(msg))
+	for _, section := range sections {
+		builder.WriteString("<div>")
+		builder.WriteString(section)
+		builder.WriteString("</div>")
+	}
+	msg = builder.String()
 	img, err := bot.htmlToImage(msg)
 	if err != nil {
 		log.Println(err)
@@ -211,12 +243,7 @@ func (bot *DeepBot) replyMessage(ctx *zero.Ctx, user *user, msg string) {
 	sendImage(ctx, img)
 }
 
-// process command about get status.
-func (bot *DeepBot) replyResponse(ctx *zero.Ctx, msg string) {
-	sendText(ctx, msg)
-}
-
-func (bot *DeepBot) replyImage(ctx *zero.Ctx, path string) {
+func (bot *DeepBot) sendImage(ctx *zero.Ctx, path string) {
 	fmt.Println("===============reply image==============")
 	fmt.Println(path)
 	fmt.Println("========================================")
