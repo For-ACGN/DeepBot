@@ -42,7 +42,7 @@ func (bot *DeepBot) replyEmoticon(ctx *zero.Ctx, user *user) {
 		dir := "data/emoticon/通用"
 		cat := selectRandomItem(dir)
 		img := selectRandomItem(cat)
-		bot.replyImage(ctx, img)
+		bot.sendImage(ctx, img)
 		return
 	}
 	role := user.getRole()
@@ -52,7 +52,7 @@ func (bot *DeepBot) replyEmoticon(ctx *zero.Ctx, user *user) {
 	}
 	dir := fmt.Sprintf("data/emoticon/%s/%s", role, category)
 	img := selectRandomItem(dir)
-	bot.replyImage(ctx, img)
+	bot.sendImage(ctx, img)
 }
 
 func selectRandomItem(dir string) string {

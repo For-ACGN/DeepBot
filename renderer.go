@@ -20,8 +20,8 @@ var asset embed.FS
 //go:embed template/renderer.html
 var renderer string
 
-func (bot *DeepBot) markdownToImage(md string) ([]byte, error) {
-	output := markdownToHTML(md)
+func (bot *DeepBot) markdownToImage(content string) ([]byte, error) {
+	output := markdownToHTML(content)
 	return bot.htmlToImage(output)
 }
 
@@ -87,15 +87,17 @@ func (bot *DeepBot) htmlToImage(content string) ([]byte, error) {
 
 		chromedp.UserDataDir(tempDir),
 	}
-	cfg := bot.config.Renderer
-	if cfg.ExecPath != "" {
-		options = append(options, chromedp.ExecPath(cfg.ExecPath))
-	}
+	options = append(options, bot.getChromedpOptions()...)
 
-	ctx, cancel := chromedp.NewExecAllocator(context.Background(), options...)
+	cfg := bot.config.Renderer
+	timeout := time.Duration(cfg.Timeout) * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	ctx, cancel = chromedp.NewExecAllocator(ctx, options...)
 	defer cancel()
 	ctx, cancel = chromedp.NewContext(ctx)
 	defer cancel()
+
 	var image []byte
 	tasks := []chromedp.Action{
 		chromedp.EmulateViewport(cfg.Width, cfg.Height, chromedp.EmulateScale(4)),
