@@ -16,20 +16,22 @@ group_id = [1234, 5678]
     url     = "ws://0.0.0.0:3001/"
     token   = ""
 
+[chromedp]
+  exec_path = "" # custom chromium kernel browser executable path
+  proxy_url = "" # example http://127.0.0.1:8080 "not add / at last"
+
 [renderer]
-  enabled   = true
-  width     = 600
-  height    = 200
-  exec_path = "" # custom chromium kernel browser
+  enabled = true
+  width   = 600
+  height  = 200
+  timeout = 15000 # millisecond
 
 [emoticon]
   rate = 10 # 0-100%
 
-[fetch_url]
-  enabled   = true
-  timeout   = 60000 # millisecond
-  proxy_url = ""
-  exec_path = "" # custom chromium kernel browser
+[browser]
+  enabled = true
+  timeout = 60000 # millisecond
 
 [eval_go]
   enabled = true
