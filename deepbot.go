@@ -60,12 +60,16 @@ type Config struct {
 	} `toml:"renderer"`
 
 	Emoticon struct {
-		Rate int `toml:"rate"`
+		Enabled bool `toml:"enabled"`
+		Rate    int  `toml:"rate"`
 	} `toml:"emoticon"`
 
 	SearchAPI struct {
-		Enabled bool `toml:"enabled"`
-		Timeout int  `toml:"timeout"`
+		Enabled  bool   `toml:"enabled"`
+		EngineID string `toml:"engine_id"`
+		APIKey   string `toml:"api_key"`
+		ProxyURL string `toml:"proxy_url"`
+		Timeout  int    `toml:"timeout"`
 	} `toml:"search_api"`
 
 	Browser struct {
@@ -133,7 +137,7 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("chat ", filter).SetBlock(true).Handle(bot.onChat)
 	zero.OnCommand("chatx ", filter).SetBlock(true).Handle(bot.onChatX)
 	zero.OnCommand("ai ", filter).SetBlock(true).Handle(bot.onReasoner)
-	zero.OnCommand("aix ", filter).SetBlock(true).Handle(bot.onReasoning)
+	zero.OnCommand("aix ", filter).SetBlock(true).Handle(bot.onReasonerX)
 	zero.OnCommand("coder ", filter).SetBlock(true).Handle(bot.onCoder)
 	zero.OnCommand("coderx ", filter).SetBlock(true).Handle(bot.onCoderX)
 	zero.OnCommand("deep.当前模型", filter).SetBlock(true).Handle(bot.onGetModel)
