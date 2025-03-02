@@ -11,9 +11,10 @@ var testBot *DeepBot
 
 func init() {
 	cfg := &Config{}
-	cfg.Renderer.ExecPath = chromePath
+	cfg.Chromedp.ExecPath = chromePath
 	cfg.Renderer.Width = 600
 	cfg.Renderer.Height = 300
+	cfg.Renderer.Timeout = 15000
 	testBot = NewDeepBot(cfg)
 }
 

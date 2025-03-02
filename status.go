@@ -57,6 +57,7 @@ func (bot *DeepBot) updateMood(user *user) (string, error) {
 	req := &ChatRequest{
 		Model:       deepseek.DeepSeekChat,
 		Temperature: 1,
+		TopP:        1,
 		MaxTokens:   8192,
 	}
 	resp, err := bot.seek(req, user, promptGetMood)

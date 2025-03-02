@@ -103,6 +103,7 @@ func (bot *DeepBot) htmlToImage(content string) ([]byte, error) {
 		chromedp.EmulateViewport(cfg.Width, cfg.Height, chromedp.EmulateScale(4)),
 		chromedp.Navigate(targetURL),
 		chromedp.Sleep(time.Second),
+		chromedp.WaitReady("/html/body"),
 		chromedp.FullScreenshot(&image, 100),
 	}
 	err = chromedp.Run(ctx, tasks...)
