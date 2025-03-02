@@ -89,8 +89,13 @@ var toolSearchImage = deepseek.Tool{
 					Type:        "string",
 					Description: "需要查询的关键字",
 				},
+				"size": &toolArgument{
+					Type: "string",
+					Description: "" +
+						"图片的尺寸大小，可选的值为huge、icon、large、medium、small、xlarge、xxlarge",
+				},
 			},
-			Required: []string{"keyword"},
+			Required: []string{"keyword", "size"},
 		},
 	},
 }
@@ -147,54 +152,37 @@ func onGetTime() string {
 	return "现在的时间是: " + s
 }
 
-func onSearchWeb(ctx context.Context, keyword string) (string, error) {
-	const baseURL = "https://customsearch.googleapis.com/customsearch/v1"
-
-	tr := http.Transport{
-		Proxy: func(*http.Request) (*url.URL, error) {
-			return url.Parse("socks5://127.0.0.1:1080/")
-		},
-	}
-	client := http.Client{
-		Transport: &tr,
-	}
-	defer client.CloseIdleConnections()
-
-	URL := fmt.Sprintf("%s?key=%s&cx=%s&q=%s", baseURL,
-		"", "", url.QueryEscape(keyword),
-	)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, URL, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+type searchCfg struct {
+	EngineID string
+	APIKey   string
+	ProxyURL string
 }
 
-func onSearchImage(ctx context.Context, keyword string) (string, error) {
-	const baseURL = "https://customsearch.googleapis.com/customsearch/v1"
+func onSearchWeb(ctx context.Context, cfg *searchCfg, keyword string) (string, error) {
+	const format = "%s?cx=%s&key=%s&q=%s&safe=active&hl=zh-cn"
+	return onSearchAPI(ctx, cfg, format, keyword)
+}
 
-	tr := http.Transport{
-		Proxy: func(*http.Request) (*url.URL, error) {
-			return url.Parse("socks5://127.0.0.1:1080/")
-		},
+func onSearchImage(ctx context.Context, cfg *searchCfg, keyword, size string) (string, error) {
+	format := "%s?cx=%s&key=%s&q=%s&searchType=image&imgSize=" + size + "&safe=active&hl=zh-cn"
+	return onSearchAPI(ctx, cfg, format, keyword)
+}
+
+func onSearchAPI(ctx context.Context, cfg *searchCfg, format, keyword string) (string, error) {
+	tr := http.Transport{}
+	proxyURL := cfg.ProxyURL
+	if proxyURL != "" {
+		tr.Proxy = func(*http.Request) (*url.URL, error) {
+			return url.Parse(proxyURL)
+		}
 	}
 	client := http.Client{
 		Transport: &tr,
 	}
 	defer client.CloseIdleConnections()
 
-	URL := fmt.Sprintf("%s?key=%s&cx=%s&q=%s&searchType=image", baseURL,
-		"", "", url.QueryEscape(keyword),
-	)
+	const baseURL = "https://customsearch.googleapis.com/customsearch/v1"
+	URL := fmt.Sprintf(format, baseURL, cfg.EngineID, cfg.APIKey, url.QueryEscape(keyword))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, URL, nil)
 	if err != nil {
 		return "", err
