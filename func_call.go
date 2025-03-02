@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -49,6 +52,46 @@ var toolGetTime = deepseek.Tool{
 		Description: "" +
 			"获取当前的日期以及时间，返回的时间字符串格式为RFC3339。" +
 			"注意不要滥用这个函数，除非确实需要获取现实世界的时间。",
+	},
+}
+
+var toolSearchWeb = deepseek.Tool{
+	Type: "function",
+	Function: deepseek.Function{
+		Name: fnSearchWeb,
+		Description: "" +
+			"使用搜索引擎来查询与关键字相关的网页内容。" +
+			"输入关键字提交给搜索引擎，返回json格式的搜索结果。",
+		Parameters: &deepseek.FunctionParameters{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"keyword": &toolArgument{
+					Type:        "string",
+					Description: "需要查询的关键字",
+				},
+			},
+			Required: []string{"keyword"},
+		},
+	},
+}
+
+var toolSearchImage = deepseek.Tool{
+	Type: "function",
+	Function: deepseek.Function{
+		Name: fnSearchImage,
+		Description: "" +
+			"使用搜索引擎来查询与关键字相关的图片内容(URL)。" +
+			"输入关键字提交给搜索引擎，返回json格式的搜索结果。",
+		Parameters: &deepseek.FunctionParameters{
+			Type: "object",
+			Properties: map[string]interface{}{
+				"keyword": &toolArgument{
+					Type:        "string",
+					Description: "需要查询的关键字",
+				},
+			},
+			Required: []string{"keyword"},
+		},
 	},
 }
 
@@ -104,6 +147,70 @@ func onGetTime() string {
 	return "现在的时间是: " + s
 }
 
+func onSearchWeb(ctx context.Context, keyword string) (string, error) {
+	const baseURL = "https://customsearch.googleapis.com/customsearch/v1"
+
+	tr := http.Transport{
+		Proxy: func(*http.Request) (*url.URL, error) {
+			return url.Parse("socks5://127.0.0.1:1080/")
+		},
+	}
+	client := http.Client{
+		Transport: &tr,
+	}
+	defer client.CloseIdleConnections()
+
+	URL := fmt.Sprintf("%s?key=%s&cx=%s&q=%s", baseURL,
+		"", "", url.QueryEscape(keyword),
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, URL, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func onSearchImage(ctx context.Context, keyword string) (string, error) {
+	const baseURL = "https://customsearch.googleapis.com/customsearch/v1"
+
+	tr := http.Transport{
+		Proxy: func(*http.Request) (*url.URL, error) {
+			return url.Parse("socks5://127.0.0.1:1080/")
+		},
+	}
+	client := http.Client{
+		Transport: &tr,
+	}
+	defer client.CloseIdleConnections()
+
+	URL := fmt.Sprintf("%s?key=%s&cx=%s&q=%s&searchType=image", baseURL,
+		"", "", url.QueryEscape(keyword),
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, URL, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 func onBrowseURL(ctx context.Context, opts []chromedp.ExecAllocatorOption, url string) (string, error) {
 	fmt.Println("================Browser=================")
 	fmt.Println(url)
@@ -154,6 +261,7 @@ func onBrowseURL(ctx context.Context, opts []chromedp.ExecAllocatorOption, url s
 
 	var output string
 	tasks := []chromedp.Action{
+		chromedp.EmulateViewport(1720, 940),
 		chromedp.Navigate(url),
 		chromedp.Sleep(time.Second),
 		chromedp.Text("/html/body", &output, chromedp.BySearch),
