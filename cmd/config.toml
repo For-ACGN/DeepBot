@@ -16,9 +16,10 @@ group_id = [1234, 5678]
     url     = "ws://0.0.0.0:3001/"
     token   = ""
 
+# generic options for renderer and browser
 [chromedp]
   exec_path = "" # custom chromium kernel browser executable path
-  proxy_url = "" # example http://127.0.0.1:8080 "not add / at last"
+  proxy_url = "" # example http://127.0.0.1:8080, NOT add "/" at last
 
 [renderer]
   enabled = true
@@ -27,7 +28,16 @@ group_id = [1234, 5678]
   timeout = 15000 # millisecond
 
 [emoticon]
-  rate = 10 # 0-100%
+  enabled = true
+  rate    = 10 # 0-100%
+
+# https://developers.google.com/custom-search/v1/reference/rest/v1/cse/list
+[search_api]
+  enabled   = true
+  engine_id = "<YOUR_ENGINE_ID>"
+  api_key   = "<YOUR_API_KEY>"
+  proxy_url = ""
+  timeout   = 15000 # millisecond
 
 [browser]
   enabled = true
