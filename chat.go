@@ -43,14 +43,13 @@ func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 
 	req := &ChatRequest{
 		Model:       deepseek.DeepSeekChat,
-		Temperature: 1,
+		Temperature: 1.2,
 		TopP:        1,
 		MaxTokens:   8192,
-		Tools:       bot.tools,
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("%s, failed to chat: %s\n", resp, err)
+		log.Printf("failed to chat: %s\n", err)
 		return
 	}
 
@@ -65,13 +64,14 @@ func (bot *DeepBot) onChatX(ctx *zero.Ctx) {
 
 	req := &ChatRequest{
 		Model:       deepseek.DeepSeekChat,
-		Temperature: 1,
+		Temperature: 1.2,
 		TopP:        1,
 		MaxTokens:   8192,
+		Tools:       bot.tools,
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("%s, failed to chat: %s\n", resp, err)
+		log.Printf("failed to chat: %s\n", err)
 		return
 	}
 
@@ -90,14 +90,14 @@ func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("%s, failed to chat: %s\n", resp, err)
+		log.Printf("failed to chat: %s\n", err)
 		return
 	}
 
 	bot.reply(ctx, user, resp.Answer)
 }
 
-func (bot *DeepBot) onReasoning(ctx *zero.Ctx) {
+func (bot *DeepBot) onReasonerX(ctx *zero.Ctx) {
 	msg := ctx.MessageString()
 	msg = strings.Replace(msg, "aix ", "", 1)
 	fmt.Println("aix", ctx.Event.GroupID, msg)
@@ -109,7 +109,7 @@ func (bot *DeepBot) onReasoning(ctx *zero.Ctx) {
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("%s, failed to chat: %s\n", resp, err)
+		log.Printf("failed to chat: %s\n", err)
 		return
 	}
 
@@ -149,11 +149,10 @@ func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
 		Temperature: 0,
 		TopP:        1,
 		MaxTokens:   8192,
-		Tools:       bot.tools,
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("%s, failed to chat: %s\n", resp, err)
+		log.Printf("failed to chat: %s\n", err)
 		return
 	}
 
@@ -171,10 +170,11 @@ func (bot *DeepBot) onCoderX(ctx *zero.Ctx) {
 		Temperature: 0,
 		TopP:        1,
 		MaxTokens:   8192,
+		Tools:       bot.tools,
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("%s, failed to chat: %s\n", resp, err)
+		log.Printf("failed to chat: %s\n", err)
 		return
 	}
 
@@ -191,12 +191,12 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 
 	req := &ChatRequest{
 		Model:     model,
-		TopP:      1,
 		MaxTokens: 8192,
 	}
 	switch model {
 	case deepseek.DeepSeekChat:
-		req.Temperature = 1.1
+		req.Temperature = 1.2
+		req.TopP = 1
 		req.Tools = bot.tools
 	case deepseek.DeepSeekReasoner:
 	default:
@@ -205,7 +205,7 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("%s, failed to chat: %s\n", resp, err)
+		log.Printf("failed to chat: %s\n", err)
 		return
 	}
 
@@ -331,7 +331,7 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 	// build and append system prompt
 	character := user.getCharacter()
 	if len(req.Tools) > 0 && req.Model != deepseek.DeepSeekReasoner {
-		character += "\n\n" + promptToolCall
+		// character += "\n\n" + promptToolCall
 	}
 	if character != "" {
 		messages = append(messages, ChatMessage{
@@ -451,7 +451,7 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 	}
 
 	// 2025/02/22 经过测试，模型暂时不会将工具函数的返回结果应用在全局上下文，只有当前一轮的问答。
-	// 可能是为了避免不及时的函数结果，但是后期可以加一个标志，使其可以应用在全局上下文。
+	// 可能是为了避免不及时的函数结果，但是后期也许可以加一个标志，使其可以应用在全局上下文。
 	// rounds := user.getRounds()
 	// rounds = append(rounds, &round{
 	// 	Question: question,
@@ -493,10 +493,16 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall, user *user) (string, 
 			return "", err
 		}
 
-		timeout := time.Duration(bot.config.SearchAPI.Timeout) * time.Millisecond
+		config := bot.config.SearchAPI
+		timeout := time.Duration(config.Timeout) * time.Millisecond
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
-		output, err := onSearchWeb(ctx, args.Keyword)
+		cfg := &searchCfg{
+			EngineID: config.EngineID,
+			APIKey:   config.APIKey,
+			ProxyURL: config.ProxyURL,
+		}
+		output, err := onSearchWeb(ctx, cfg, args.Keyword)
 		if err != nil {
 			return "failed to search web: " + err.Error(), nil
 		}
@@ -509,16 +515,23 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall, user *user) (string, 
 
 		args := struct {
 			Keyword string `json:"keyword"`
+			Size    string `json:"size"`
 		}{}
 		err = decoder.Decode(&args)
 		if err != nil {
 			return "", err
 		}
 
-		timeout := time.Duration(bot.config.SearchAPI.Timeout) * time.Millisecond
+		config := bot.config.SearchAPI
+		timeout := time.Duration(config.Timeout) * time.Millisecond
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
-		output, err := onSearchImage(ctx, args.Keyword)
+		cfg := &searchCfg{
+			EngineID: config.EngineID,
+			APIKey:   config.APIKey,
+			ProxyURL: config.ProxyURL,
+		}
+		output, err := onSearchImage(ctx, cfg, args.Keyword, args.Size)
 		if err != nil {
 			return "failed to search image: " + err.Error(), nil
 		}
