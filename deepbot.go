@@ -180,18 +180,6 @@ func (bot *DeepBot) Run() {
 	zero.RunAndBlock(&cfg, nil)
 }
 
-func (bot *DeepBot) getChromedpOptions() []chromedp.ExecAllocatorOption {
-	var options []chromedp.ExecAllocatorOption
-	cfg := bot.config.Chromedp
-	if cfg.ExecPath != "" {
-		options = append(options, chromedp.ExecPath(cfg.ExecPath))
-	}
-	if cfg.ProxyURL != "" {
-		options = append(options, chromedp.ProxyServer(cfg.ProxyURL))
-	}
-	return options
-}
-
 func (bot *DeepBot) getUser(uid int64) *user {
 	bot.usersMu.Lock()
 	defer bot.usersMu.Unlock()
@@ -203,11 +191,16 @@ func (bot *DeepBot) getUser(uid int64) *user {
 	return user
 }
 
-//go:embed template/help.md
-var helpMD string
-
-func (bot *DeepBot) onHelp(ctx *zero.Ctx) {
-	bot.reply(ctx, nil, helpMD)
+func (bot *DeepBot) getChromedpOptions() []chromedp.ExecAllocatorOption {
+	var options []chromedp.ExecAllocatorOption
+	cfg := bot.config.Chromedp
+	if cfg.ExecPath != "" {
+		options = append(options, chromedp.ExecPath(cfg.ExecPath))
+	}
+	if cfg.ProxyURL != "" {
+		options = append(options, chromedp.ProxyServer(cfg.ProxyURL))
+	}
+	return options
 }
 
 // process command about chat.
@@ -300,4 +293,11 @@ func sendImage(ctx *zero.Ctx, img []byte) {
 		return
 	}
 	ctx.Send(message.ImageBytes(img))
+}
+
+//go:embed template/help.md
+var helpMD string
+
+func (bot *DeepBot) onHelp(ctx *zero.Ctx) {
+	bot.reply(ctx, nil, helpMD)
 }
