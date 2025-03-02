@@ -63,6 +63,11 @@ type Config struct {
 		Rate int `toml:"rate"`
 	} `toml:"emoticon"`
 
+	SearchAPI struct {
+		Enabled bool `toml:"enabled"`
+		Timeout int  `toml:"timeout"`
+	} `toml:"search_api"`
+
 	Browser struct {
 		Enabled bool `toml:"enabled"`
 		Timeout int  `toml:"timeout"`
@@ -96,6 +101,10 @@ func NewDeepBot(config *Config) *DeepBot {
 	// build tools from config
 	var tools []deepseek.Tool
 	tools = append(tools, toolGetTime)
+	if config.SearchAPI.Enabled {
+		tools = append(tools, toolSearchWeb)
+		tools = append(tools, toolSearchImage)
+	}
 	if config.Browser.Enabled {
 		tools = append(tools, toolBrowseURL)
 	}
@@ -126,6 +135,7 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("ai ", filter).SetBlock(true).Handle(bot.onReasoner)
 	zero.OnCommand("aix ", filter).SetBlock(true).Handle(bot.onReasoning)
 	zero.OnCommand("coder ", filter).SetBlock(true).Handle(bot.onCoder)
+	zero.OnCommand("coderx ", filter).SetBlock(true).Handle(bot.onCoderX)
 	zero.OnCommand("deep.当前模型", filter).SetBlock(true).Handle(bot.onGetModel)
 	zero.OnCommand("deep.设置模型 ", filter).SetBlock(true).Handle(bot.onSetModel)
 	zero.OnCommand("deep.启用函数", filter).SetBlock(true).Handle(bot.onEnableToolCall)
