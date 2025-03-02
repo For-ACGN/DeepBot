@@ -43,7 +43,8 @@ func (bot *DeepBot) onChat(ctx *zero.Ctx) {
 
 	req := &ChatRequest{
 		Model:       deepseek.DeepSeekChat,
-		Temperature: 1.3,
+		Temperature: 1,
+		TopP:        1,
 		MaxTokens:   8192,
 		Tools:       bot.tools,
 	}
@@ -64,7 +65,8 @@ func (bot *DeepBot) onChatX(ctx *zero.Ctx) {
 
 	req := &ChatRequest{
 		Model:       deepseek.DeepSeekChat,
-		Temperature: 1.3,
+		Temperature: 1,
+		TopP:        1,
 		MaxTokens:   8192,
 	}
 	resp, err := bot.chat(req, user, msg)
@@ -83,9 +85,8 @@ func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
 	req := &ChatRequest{
-		Model:       deepseek.DeepSeekReasoner,
-		Temperature: 1.2,
-		MaxTokens:   8192,
+		Model:     deepseek.DeepSeekReasoner,
+		MaxTokens: 8192,
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
@@ -103,9 +104,8 @@ func (bot *DeepBot) onReasoning(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
 	req := &ChatRequest{
-		Model:       deepseek.DeepSeekReasoner,
-		Temperature: 1.2,
-		MaxTokens:   8192,
+		Model:     deepseek.DeepSeekReasoner,
+		MaxTokens: 8192,
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
@@ -145,8 +145,31 @@ func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
 	req := &ChatRequest{
-		Model:       deepseek.DeepSeekCoder,
+		Model:       deepseek.DeepSeekChat,
 		Temperature: 0,
+		TopP:        1,
+		MaxTokens:   8192,
+		Tools:       bot.tools,
+	}
+	resp, err := bot.chat(req, user, msg)
+	if err != nil {
+		log.Printf("%s, failed to chat: %s\n", resp, err)
+		return
+	}
+
+	bot.reply(ctx, user, resp.Answer)
+}
+
+func (bot *DeepBot) onCoderX(ctx *zero.Ctx) {
+	msg := ctx.MessageString()
+	msg = strings.Replace(msg, "coderx ", "", 1)
+	fmt.Println("coderx", ctx.Event.GroupID, msg)
+	user := bot.getUser(ctx.Event.UserID)
+
+	req := &ChatRequest{
+		Model:       deepseek.DeepSeekChat,
+		Temperature: 0,
+		TopP:        1,
 		MaxTokens:   8192,
 	}
 	resp, err := bot.chat(req, user, msg)
@@ -167,17 +190,15 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 	model := user.getModel()
 
 	req := &ChatRequest{
-		MaxTokens: 8192,
 		Model:     model,
+		TopP:      1,
+		MaxTokens: 8192,
 	}
 	switch model {
 	case deepseek.DeepSeekChat:
-		req.Temperature = 1.3
+		req.Temperature = 1.1
 		req.Tools = bot.tools
-	case deepseek.DeepSeekCoder:
-		req.Temperature = 0
 	case deepseek.DeepSeekReasoner:
-		req.Temperature = 1.2
 	default:
 		bot.sendText(ctx, "非法模型名称")
 		return
@@ -211,8 +232,6 @@ func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
 		model = deepseek.DeepSeekReasoner
 	case "chat":
 		model = deepseek.DeepSeekChat
-	case "coder":
-		model = deepseek.DeepSeekCoder
 	case "8b":
 		model = "deepseek-r1:8b" // 联合测试使用
 	default:
@@ -384,15 +403,17 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 }
 
 func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user) (*ChatResponse, error) {
-	toolCalls := resp.Choices[0].Message.ToolCalls
+	msg := resp.Choices[0].Message
+	toolCalls := msg.ToolCalls
 	numCalls := len(toolCalls)
 	if numCalls == 0 {
 		return resp, nil
 	}
-	fmt.Println("num calls:", numCalls)
+	fmt.Println("num tool calls:", numCalls)
 
 	question := ChatMessage{
 		Role:      deepseek.ChatMessageRoleAssistant,
+		Content:   msg.Content,
 		ToolCalls: toolCalls,
 	}
 	var answers []ChatMessage
@@ -417,9 +438,10 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 	messages = append(messages, question)
 	messages = append(messages, answers...)
 	toolReq := &ChatRequest{
-		Model:       deepseek.DeepSeekChat,
+		Model:       req.Model,
 		Messages:    messages,
-		Temperature: 1.3,
+		Temperature: req.Temperature,
+		TopP:        req.TopP,
 		MaxTokens:   8192,
 		// Tools:       updateTools(user, req.Tools),
 	}
@@ -457,6 +479,50 @@ func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall, user *user) (string, 
 		}
 
 		answer = onGetTime()
+	case fnSearchWeb:
+		err := checkToolLimit(user, fnSearchWeb)
+		if err != nil {
+			return "", err
+		}
+
+		args := struct {
+			Keyword string `json:"keyword"`
+		}{}
+		err = decoder.Decode(&args)
+		if err != nil {
+			return "", err
+		}
+
+		timeout := time.Duration(bot.config.SearchAPI.Timeout) * time.Millisecond
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		output, err := onSearchWeb(ctx, args.Keyword)
+		if err != nil {
+			return "failed to search web: " + err.Error(), nil
+		}
+		answer = output
+	case fnSearchImage:
+		err := checkToolLimit(user, fnSearchImage)
+		if err != nil {
+			return "", err
+		}
+
+		args := struct {
+			Keyword string `json:"keyword"`
+		}{}
+		err = decoder.Decode(&args)
+		if err != nil {
+			return "", err
+		}
+
+		timeout := time.Duration(bot.config.SearchAPI.Timeout) * time.Millisecond
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		output, err := onSearchImage(ctx, args.Keyword)
+		if err != nil {
+			return "failed to search image: " + err.Error(), nil
+		}
+		answer = output
 	case fnBrowseURL:
 		err := checkToolLimit(user, fnBrowseURL)
 		if err != nil {
