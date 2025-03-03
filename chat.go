@@ -267,11 +267,7 @@ func (bot *DeepBot) onReset(ctx *zero.Ctx) {
 }
 
 func (bot *DeepBot) onPoke(ctx *zero.Ctx) {
-	event := ctx.Event
-	if !event.IsToMe {
-		return
-	}
-	if event.NoticeType != "notify" || event.SubType != "poke" {
+	if !ctx.Event.IsToMe {
 		return
 	}
 
@@ -443,7 +439,7 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 		Temperature: req.Temperature,
 		TopP:        req.TopP,
 		MaxTokens:   8192,
-		// Tools:       updateTools(user, req.Tools),
+		Tools:       updateTools(user, req.Tools),
 	}
 	resp, err := bot.client.CreateChatCompletion(context.Background(), toolReq)
 	if err != nil {
@@ -466,125 +462,147 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 }
 
 func (bot *DeepBot) doToolCall(toolCall deepseek.ToolCall, user *user) (string, error) {
-	decoder := json.NewDecoder(strings.NewReader(toolCall.Function.Arguments))
+	arguments := toolCall.Function.Arguments
+	decoder := json.NewDecoder(strings.NewReader(arguments))
 	decoder.DisallowUnknownFields()
-
+	var (
+		answer string
+		err    error
+	)
 	fnName := toolCall.Function.Name
-	var answer string
 	switch fnName {
 	case fnGetTime:
-		err := checkToolLimit(user, fnGetTime)
-		if err != nil {
-			return "", err
-		}
-
-		answer = onGetTime()
+		answer, err = bot.onGetTime(user)
 	case fnSearchWeb:
-		err := checkToolLimit(user, fnSearchWeb)
-		if err != nil {
-			return "", err
-		}
-
-		args := struct {
-			Keyword string `json:"keyword"`
-		}{}
-		err = decoder.Decode(&args)
-		if err != nil {
-			return "", err
-		}
-
-		config := bot.config.SearchAPI
-		timeout := time.Duration(config.Timeout) * time.Millisecond
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		cfg := &searchCfg{
-			EngineID: config.EngineID,
-			APIKey:   config.APIKey,
-			ProxyURL: config.ProxyURL,
-		}
-		output, err := onSearchWeb(ctx, cfg, args.Keyword)
-		if err != nil {
-			return "failed to search web: " + err.Error(), nil
-		}
-		answer = output
+		answer, err = bot.onSearchWeb(decoder, user)
 	case fnSearchImage:
-		err := checkToolLimit(user, fnSearchImage)
-		if err != nil {
-			return "", err
-		}
-
-		args := struct {
-			Keyword string `json:"keyword"`
-			Size    string `json:"size"`
-		}{}
-		err = decoder.Decode(&args)
-		if err != nil {
-			return "", err
-		}
-
-		config := bot.config.SearchAPI
-		timeout := time.Duration(config.Timeout) * time.Millisecond
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		cfg := &searchCfg{
-			EngineID: config.EngineID,
-			APIKey:   config.APIKey,
-			ProxyURL: config.ProxyURL,
-		}
-		output, err := onSearchImage(ctx, cfg, args.Keyword, args.Size)
-		if err != nil {
-			return "failed to search image: " + err.Error(), nil
-		}
-		answer = output
+		answer, err = bot.onSearchImage(decoder, user)
 	case fnBrowseURL:
-		err := checkToolLimit(user, fnBrowseURL)
-		if err != nil {
-			return "", err
-		}
-
-		args := struct {
-			URL string `json:"url"`
-		}{}
-		err = decoder.Decode(&args)
-		if err != nil {
-			return "", err
-		}
-
-		timeout := time.Duration(bot.config.Browser.Timeout) * time.Millisecond
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		options := bot.getChromedpOptions()
-		output, err := onBrowseURL(ctx, options, args.URL)
-		if err != nil {
-			return "Chromedp Error: " + err.Error(), nil
-		}
-		answer = output
+		answer, err = bot.onBrowseURL(decoder, user)
 	case fnEvalGo:
-		err := checkToolLimit(user, fnEvalGo)
-		if err != nil {
-			return "", err
-		}
-
-		args := struct {
-			Src string `json:"src"`
-		}{}
-		err = decoder.Decode(&args)
-		if err != nil {
-			return "", err
-		}
-
-		timeout := time.Duration(bot.config.EvalGo.Timeout) * time.Millisecond
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		output, err := onEvalGo(ctx, args.Src)
-		if err != nil {
-			return "Go Error: " + err.Error(), nil
-		}
-		answer = output
+		answer, err = bot.onEvalGo(decoder, user)
 	default:
 		return "", fmt.Errorf("unknown function: %s", fnName)
 	}
-	return answer, nil
+	return answer, err
+}
+
+func (bot *DeepBot) onGetTime(user *user) (string, error) {
+	err := checkToolLimit(user, fnGetTime)
+	if err != nil {
+		return "", err
+	}
+	return onGetTime(), nil
+}
+
+func (bot *DeepBot) onSearchWeb(decoder *json.Decoder, user *user) (string, error) {
+	err := checkToolLimit(user, fnSearchWeb)
+	if err != nil {
+		return "", err
+	}
+
+	args := struct {
+		Keyword string `json:"keyword"`
+	}{}
+	err = decoder.Decode(&args)
+	if err != nil {
+		return "", err
+	}
+
+	config := bot.config.SearchAPI
+	timeout := time.Duration(config.Timeout) * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cfg := &searchCfg{
+		EngineID: config.EngineID,
+		APIKey:   config.APIKey,
+		ProxyURL: config.ProxyURL,
+	}
+	output, err := onSearchWeb(ctx, cfg, args.Keyword)
+	if err != nil {
+		return "failed to search web: " + err.Error(), nil
+	}
+	return output, nil
+}
+
+func (bot *DeepBot) onSearchImage(decoder *json.Decoder, user *user) (string, error) {
+	err := checkToolLimit(user, fnSearchImage)
+	if err != nil {
+		return "", err
+	}
+
+	args := struct {
+		Keyword string `json:"keyword"`
+		Size    string `json:"size"`
+	}{}
+	err = decoder.Decode(&args)
+	if err != nil {
+		return "", err
+	}
+
+	config := bot.config.SearchAPI
+	timeout := time.Duration(config.Timeout) * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cfg := &searchCfg{
+		EngineID: config.EngineID,
+		APIKey:   config.APIKey,
+		ProxyURL: config.ProxyURL,
+	}
+	output, err := onSearchImage(ctx, cfg, args.Keyword, args.Size)
+	if err != nil {
+		return "failed to search image: " + err.Error(), nil
+	}
+	return output, nil
+}
+
+func (bot *DeepBot) onBrowseURL(decoder *json.Decoder, user *user) (string, error) {
+	err := checkToolLimit(user, fnBrowseURL)
+	if err != nil {
+		return "", err
+	}
+
+	args := struct {
+		URL string `json:"url"`
+	}{}
+	err = decoder.Decode(&args)
+	if err != nil {
+		return "", err
+	}
+
+	timeout := time.Duration(bot.config.Browser.Timeout) * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	options := bot.getChromedpOptions()
+	output, err := onBrowseURL(ctx, options, args.URL)
+	if err != nil {
+		return "Chromedp Error: " + err.Error(), nil
+	}
+	return output, nil
+}
+
+func (bot *DeepBot) onEvalGo(decoder *json.Decoder, user *user) (string, error) {
+	err := checkToolLimit(user, fnEvalGo)
+	if err != nil {
+		return "", err
+	}
+
+	args := struct {
+		Src string `json:"src"`
+	}{}
+	err = decoder.Decode(&args)
+	if err != nil {
+		return "", err
+	}
+
+	timeout := time.Duration(bot.config.EvalGo.Timeout) * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	output, err := onEvalGo(ctx, args.Src)
+	if err != nil {
+		return "Go Error: " + err.Error(), nil
+	}
+	return output, nil
 }
 
 func resetToolLimit(user *user) {
