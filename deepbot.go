@@ -64,6 +64,10 @@ type Config struct {
 		Rate    int  `toml:"rate"`
 	} `toml:"emoticon"`
 
+	Memory struct {
+		Enabled bool `toml:"enabled"`
+	} `toml:"memory"`
+
 	SearchAPI struct {
 		Enabled  bool   `toml:"enabled"`
 		EngineID string `toml:"engine_id"`
@@ -178,7 +182,7 @@ func (bot *DeepBot) Run() {
 			if connected {
 				return
 			}
-			time.Sleep(time.Second)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 	var drivers []zero.Driver
@@ -192,8 +196,9 @@ func (bot *DeepBot) Run() {
 		drivers = append(drivers, driver.NewWebSocketServer(1, server.URL, server.Token))
 	}
 	cfg := zero.Config{
-		NickName: []string{"deepbot"},
-		Driver:   drivers,
+		NickName:       []string{"deepbot"},
+		Driver:         drivers,
+		MaxProcessTime: 15 * time.Minute,
 	}
 	zero.RunAndBlock(&cfg, nil)
 }
@@ -222,14 +227,7 @@ func (bot *DeepBot) getChromedpOptions() []chromedp.ExecAllocatorOption {
 }
 
 func (bot *DeepBot) onConnect(ctx *zero.Ctx) {
-	return
-	params := make(zero.Params)
-	params["group_id"] = 123
-	params["message_seq"] = 0
-	params["count"] = 10
-	params["reverseOrder"] = false
-	resp := ctx.CallAction("get_group_msg_history", params)
-	fmt.Println(resp.Data)
+	bot.generateSTM(ctx)
 }
 
 func (bot *DeepBot) onNotice(ctx *zero.Ctx) {

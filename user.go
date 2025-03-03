@@ -63,7 +63,7 @@ func (user *user) initDir() error {
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(fmt.Sprintf("data/memory/%d", user.id), 0755)
+	err = os.MkdirAll(fmt.Sprintf("data/memory/private/%d", user.id), 0755)
 	if err != nil {
 		return err
 	}
