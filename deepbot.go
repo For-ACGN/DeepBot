@@ -162,11 +162,25 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("deep.帮助文档", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnCommand("deep.帮助信息", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnMessage(filter).SetBlock(true).Handle(bot.onMessage)
-	zero.OnNotice(filter).SetBlock(true).Handle(bot.onPoke)
+	zero.OnNotice(filter).SetBlock(true).Handle(bot.onNotice)
 	return &bot
 }
 
 func (bot *DeepBot) Run() {
+	go func() {
+		for {
+			var connected bool
+			zero.RangeBot(func(_ int64, ctx *zero.Ctx) bool {
+				connected = true
+				bot.onConnect(ctx)
+				return false
+			})
+			if connected {
+				return
+			}
+			time.Sleep(time.Second)
+		}
+	}()
 	var drivers []zero.Driver
 	onebot := bot.config.OneBot
 	client := onebot.WSClient
@@ -207,11 +221,35 @@ func (bot *DeepBot) getChromedpOptions() []chromedp.ExecAllocatorOption {
 	return options
 }
 
+func (bot *DeepBot) onConnect(ctx *zero.Ctx) {
+	return
+	params := make(zero.Params)
+	params["group_id"] = 123
+	params["message_seq"] = 0
+	params["count"] = 10
+	params["reverseOrder"] = false
+	resp := ctx.CallAction("get_group_msg_history", params)
+	fmt.Println(resp.Data)
+}
+
+func (bot *DeepBot) onNotice(ctx *zero.Ctx) {
+	event := ctx.Event
+	switch event.NoticeType {
+	case "notify":
+		switch event.SubType {
+		case "poke":
+			bot.onPoke(ctx)
+		default:
+		}
+	default:
+	}
+}
+
 // process command about chat.
 func (bot *DeepBot) reply(ctx *zero.Ctx, user *user, msg string) {
 	defer bot.postProcess(ctx, user, msg)
 	if !bot.config.Renderer.Enabled {
-		sendText(ctx, msg)
+		sendText(ctx, msg, true)
 		return
 	}
 	if isMarkdown(msg) {
@@ -223,26 +261,32 @@ func (bot *DeepBot) reply(ctx *zero.Ctx, user *user, msg string) {
 		sendImage(ctx, img)
 		return
 	}
-	bot.sendText(ctx, msg)
+	if len(msg) < 1024 {
+		sendText(ctx, msg, true)
+		return
+	}
+	bot.sendLongText(ctx, msg)
 }
 
 // process command about get status.
-func (bot *DeepBot) sendText(ctx *zero.Ctx, msg string) {
-	if len(msg) < 1024 {
-		sendText(ctx, msg)
+func (bot *DeepBot) sendText(ctx *zero.Ctx, text string) {
+	if !bot.config.Renderer.Enabled || len(text) < 1024 {
+		sendText(ctx, text, false)
 		return
 	}
-	// renderer long text to image
-	sections := strings.Split(msg, "\n")
+	bot.sendLongText(ctx, text)
+}
+
+func (bot *DeepBot) sendLongText(ctx *zero.Ctx, text string) {
+	sections := strings.Split(text, "\n")
 	builder := strings.Builder{}
-	builder.Grow(len(msg))
+	builder.Grow(len(text))
 	for _, section := range sections {
 		builder.WriteString("<div>")
 		builder.WriteString(section)
 		builder.WriteString("</div>")
 	}
-	msg = builder.String()
-	img, err := bot.htmlToImage(msg)
+	img, err := bot.htmlToImage(builder.String())
 	if err != nil {
 		log.Println(err)
 		return
@@ -263,23 +307,31 @@ func (bot *DeepBot) sendImage(ctx *zero.Ctx, path string) {
 	sendImage(ctx, img)
 }
 
-func sendText(ctx *zero.Ctx, msg string) {
+func sendText(ctx *zero.Ctx, text string, reply bool) {
 	// wait random time before send
 	time.Sleep(time.Duration(500+rand.IntN(2000)) * time.Millisecond)
 	// process private chat
 	if ctx.Event.GroupID == 0 {
-		ctx.Send(message.Text(msg))
+		ctx.Send(message.Text(text))
+		return
+	}
+	// check need use reply type
+	if reply {
+		array := message.Message{}
+		array = append(array, message.Reply(ctx.Event.MessageID))
+		array = append(array, message.Text(text))
+		ctx.Send(array)
 		return
 	}
 	// random send message with at
 	if ctx.Event.IsToMe && rand.IntN(3) == 0 {
 		array := message.Message{}
 		array = append(array, message.At(ctx.Event.UserID))
-		array = append(array, message.Text(" "+msg))
+		array = append(array, message.Text(" "+text))
 		ctx.Send(array)
 		return
 	}
-	ctx.Send(message.Text(msg))
+	ctx.Send(message.Text(text))
 }
 
 func sendImage(ctx *zero.Ctx, img []byte) {

@@ -21,9 +21,8 @@ const promptToolCall = `
    你可以使用浏览器来访问原先你访问不到的外部资源，具体请使用BrowseURL工具函数。
    你可以生成并且执行Go语言代码，来访问原先你访问不到的外部资源，具体请使用EvalGo工具函数。
    请注意如果你只是需要浏览网页，请优先使用BrowseURL，而不是生成相关代码使用EvalGo来访问。
-   一般来说，不要重复地访问同一个URL，以及不要递归访问网站内容中的出现URL。
-   一般来说，仅当你需要访问实时信息时才应该使用BrowseURL工具函数。
-   禁止多次来回调用BrowseURL工具函数，一轮对话中只允许使用一次BrowseURL。
+   不要重复地访问同一个URL，以及不要递归访问网站内容中的出现URL。
+   仅当你需要访问实时信息时才应该使用BrowseURL工具函数。
 `
 
 type chatResp struct {
@@ -327,7 +326,7 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 	// build and append system prompt
 	character := user.getCharacter()
 	if len(req.Tools) > 0 && req.Model != deepseek.DeepSeekReasoner {
-		// character += "\n\n" + promptToolCall
+		character += "\n\n" + promptToolCall
 	}
 	if character != "" {
 		messages = append(messages, ChatMessage{
