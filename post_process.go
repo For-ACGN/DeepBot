@@ -27,7 +27,11 @@ func (bot *DeepBot) mayUpdateMood(user *user) {
 }
 
 func (bot *DeepBot) randomEmoticon(ctx *zero.Ctx, user *user) {
-	rate := bot.config.Emoticon.Rate
+	cfg := bot.config.Emoticon
+	if !cfg.Enabled {
+		return
+	}
+	rate := cfg.Rate
 	if rate < 1 {
 		return
 	}
