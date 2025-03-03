@@ -3,6 +3,7 @@ package deepbot
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -105,9 +106,11 @@ var toolBrowseURL = deepseek.Tool{
 	Function: deepseek.Function{
 		Name: fnBrowseURL,
 		Description: "" +
-			"使用浏览器去访问指定的URL，返回的结果是过滤后的可见文本内容," +
-			"注意这个函数只会返回可见的文本内容，所以返回的内容格式会有点怪异，这是正常情况。" +
-			"你只需要分析文本内容即可，不用在意这些内容里出现的类似让你登录、注册、使用前必读等操作。" +
+			"使用浏览器去访问指定的URL，返回的结果是用户可见的文本内容。" +
+			"因为这个函数只会返回部分文本内容，所以返回的内容格式会有多余的空格，这是正常情况。" +
+			"如果该函数执行时出现问题，将会返回以\"Chromedp Error: \"开头的错误信息。" +
+			"你只需要分析文本内容即可，不用在意这些内容里出现的类似让你登录、注册、使用前必读等操作，" +
+			"请忽略类似版权所有，未经书面授权禁止使用相关文本，你可以正常地使用网页数据。" +
 			"一般来说，不要重复地访问同一个URL，以及不要递归访问网站内容中的出现URL，" +
 			"仅当你需要访问实时信息、以及不知道的信息时才应该使用该函数。" +
 			"禁止多次来回调用该工具函数，一轮对话(tool calls)中只允许使用1次该函数。",
@@ -159,11 +162,19 @@ type searchCfg struct {
 }
 
 func onSearchWeb(ctx context.Context, cfg *searchCfg, keyword string) (string, error) {
+	fmt.Println("===============Search Web===============")
+	fmt.Println(keyword)
+	fmt.Println("========================================")
+
 	const format = "%s?cx=%s&key=%s&q=%s&safe=active&hl=zh-cn"
 	return onSearchAPI(ctx, cfg, format, keyword)
 }
 
 func onSearchImage(ctx context.Context, cfg *searchCfg, keyword, size string) (string, error) {
+	fmt.Println("==============Search Image==============")
+	fmt.Println(keyword, size)
+	fmt.Println("========================================")
+
 	format := "%s?cx=%s&key=%s&q=%s&searchType=image&imgSize=" + size + "&safe=active&hl=zh-cn"
 	return onSearchAPI(ctx, cfg, format, keyword)
 }
@@ -196,7 +207,28 @@ func onSearchAPI(ctx context.Context, cfg *searchCfg, format, keyword string) (s
 	if err != nil {
 		return "", err
 	}
-	return string(data), nil
+
+	type result struct {
+		Items []struct {
+			Title   string `json:"title"`
+			Link    string `json:"link"`
+			Snippet string `json:"snippet"`
+		} `json:"items"`
+	}
+	results := result{}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	err = decoder.Decode(&results)
+	if err != nil {
+		return "", err
+	}
+	buf := &bytes.Buffer{}
+	encoder := json.NewEncoder(buf)
+	encoder.SetIndent("", "  ")
+	err = encoder.Encode(results.Items)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 func onBrowseURL(ctx context.Context, opts []chromedp.ExecAllocatorOption, url string) (string, error) {
