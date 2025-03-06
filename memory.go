@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 	"time"
-	
+
 	"github.com/cohesion-org/deepseek-go"
 	"github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
@@ -63,12 +63,13 @@ func (bot *DeepBot) buildSTM(ctx *zero.Ctx) {
 	params := make(zero.Params)
 	params["group_id"] = bot.config.GroupID[0]
 	params["message_seq"] = 0
-	params["count"] = 300
+	params["count"] = 550
+
 	resp := ctx.CallAction("get_group_msg_history", params)
 	if resp.Status != "ok" {
 		return
 	}
-	
+
 	var messages []*msgType
 	raw := resp.Data.Get("messages").Raw
 	err := json.NewDecoder(strings.NewReader(raw)).Decode(&messages)
@@ -76,9 +77,9 @@ func (bot *DeepBot) buildSTM(ctx *zero.Ctx) {
 		log.Println("failed to read group history message:", err)
 		return
 	}
-	
-	messages = messages[:260]
-	
+
+	messages = messages[:400]
+
 	var items []*msgItem
 	for _, msg := range messages {
 		var content string
@@ -100,6 +101,7 @@ func (bot *DeepBot) buildSTM(ctx *zero.Ctx) {
 		if msg.Sender.Card != "" {
 			userName = msg.Sender.Card
 		}
+
 		item := &msgItem{
 			MessageID: msg.MessageID,
 			DateTime:  dateTime,
@@ -109,7 +111,7 @@ func (bot *DeepBot) buildSTM(ctx *zero.Ctx) {
 		}
 		items = append(items, item)
 	}
-	
+
 	buf := bytes.NewBuffer(make([]byte, 0, len(items)*64))
 	encoder := json.NewEncoder(buf)
 	encoder.SetIndent("", "  ")
@@ -118,9 +120,9 @@ func (bot *DeepBot) buildSTM(ctx *zero.Ctx) {
 		log.Println("failed to encode history message:", err)
 		return
 	}
-	
+
 	fmt.Println(buf)
-	
+
 	// 	prompt := `
 	// 以下是你加入的一个群聊中最近的消息(JSON格式)，你是一名活跃的群员，
 	// 你现在要根据以下的历史对话内容来发送一条最符合你人设的消息。
@@ -134,8 +136,63 @@ func (bot *DeepBot) buildSTM(ctx *zero.Ctx) {
 	// [reply]: 此条消息回复了之前的一条消息，后面的参数是message_id。
 	// ========================历史对话内容========================
 	// `
-	
+
 	prompt := `
+[人物设定]
+你是一个记忆助理，可以从过往的聊天记录中总结出有价值的记忆。
+
+[工作目标]
+以下是你加入的一个群聊中最近的消息, 你需要从用户聊天记录中
+提取出与群友们有价值的短期记忆和长期记忆。
+
+[处理流程]
+1. **信息分类**
+   识别以下内容中的关键实体和事件，按类别归类：
+   - 人物/宠物
+   -  人物性格
+   -  人物习惯
+   - 兴趣爱好
+   - 近期事件
+   - 用户表达的情绪
+
+2. **时间线梳理**
+   按时间顺序排列重要事件，示例：
+   - 2024-03-01：用户A提到养了一只猫，名字叫小白
+   - 2024-03-15：用户A说周末带小白去公园
+
+3. **生成总结**
+     你总结的记忆格式为 日期, user_id, user_name, 总结出的记忆内容
+   示例: "2025-03-04 19:11:22, 12345678, 用户A, 用户A喜欢吃苹果"
+   每条记忆直接记得加换行。
+
+[聊天记录结构]
+示例:
+  {
+    "message_id": 132361297,
+    "date_time": "2025-03-05 19:11:22",
+    "user_name": "用户A",
+    "user_id": 12345678,
+    "content": "[reply]: 132361296\n[at]: 12345679\n[text]:  肯定的\n"
+  },
+
+  常规回复
+  at人
+  回复某人
+
+message_id 是 消息的id
+date_time 是该消息发送时的时间
+user_name 是该用户在群聊中的昵称
+user_id 是该用户的uid
+
+content中有三类消息:
+[text]: 纯文本数据。
+[at]: 此条消息@了某位其他群员，后面的参数是user_id。
+[reply]: 此条消息回复了之前的一条消息，后面的参数是message_id。
+
+========================历史聊天记录=======================
+`
+
+	prompt = `
 以下是你加入的一个群聊中最近的消息(JSON格式)，你是一名活跃的群员，
 你现在要根据以下的历史对话内容来总结出与群友有价值的短期记忆和长期记忆。
 记忆内容通常包含了确切的事件内容、个人爱好、个人习惯等。
@@ -147,29 +204,29 @@ content中有三类消息:
 [reply]: 此条消息回复了之前的一条消息，后面的参数是message_id。
 ========================历史对话内容=======================
 `
-	
+
 	prompt += buf.String()
-	
+
 	fmt.Println(len(prompt))
-	
+
 	req := &ChatRequest{
 		Model:       deepseek.DeepSeekReasoner,
 		Temperature: 1.3,
 		TopP:        1,
 		MaxTokens:   2048,
 	}
-	
+
 	user := new(user)
-	
+
 	response, err := bot.seek(req, user, prompt)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	fmt.Println(response.Answer)
-	
+
 	ctx.SendGroupMessage(bot.config.GroupID[0], message.Text(response.Answer))
-	
+
 	// for _, msg := range messages {
 	// 	fmt.Println()
 	//
