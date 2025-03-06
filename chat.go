@@ -184,6 +184,10 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 	if !ctx.Event.IsToMe {
 		return
 	}
+	if ctx.Event.GroupID != 0 {
+		return
+	}
+
 	msg := ctx.MessageString()
 	user := bot.getUser(ctx.Event.UserID)
 	model := user.getModel()
@@ -438,7 +442,7 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 		Temperature: req.Temperature,
 		TopP:        req.TopP,
 		MaxTokens:   8192,
-		Tools:       updateTools(user, req.Tools),
+		// Tools:       updateTools(user, req.Tools),
 	}
 	resp, err := bot.client.CreateChatCompletion(context.Background(), toolReq)
 	if err != nil {

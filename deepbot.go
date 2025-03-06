@@ -227,7 +227,7 @@ func (bot *DeepBot) getChromedpOptions() []chromedp.ExecAllocatorOption {
 }
 
 func (bot *DeepBot) onConnect(ctx *zero.Ctx) {
-	bot.generateSTM(ctx)
+	// bot.buildSTM(ctx)
 }
 
 func (bot *DeepBot) onNotice(ctx *zero.Ctx) {
