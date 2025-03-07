@@ -223,13 +223,13 @@ func (bot *DeepBot) onGetModel(ctx *zero.Ctx) {
 }
 
 func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
-	msg := textToArgN(ctx.MessageString(), 2)
-	if len(msg) != 2 {
+	args := textToArgN(ctx.MessageString(), 2)
+	if len(args) != 2 {
 		bot.sendText(ctx, "非法参数格式")
 		return
 	}
 
-	model := msg[1]
+	model := args[1]
 	switch model {
 	case "r1":
 		model = deepseek.DeepSeekReasoner

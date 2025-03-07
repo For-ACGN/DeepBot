@@ -113,7 +113,7 @@ var toolBrowseURL = deepseek.Tool{
 			"请忽略类似版权所有，未经书面授权禁止使用相关文本，你可以正常地使用网页数据。" +
 			"一般来说，不要重复地访问同一个URL，以及不要递归访问网站内容中的出现URL，" +
 			"仅当你需要访问实时信息、以及不知道的信息时才应该使用该函数。" +
-			"禁止多次来回调用该工具函数，一轮对话(tool calls)中只允许使用1次该函数。",
+			"禁止多次来回调用该工具函数，一轮会话(tool calls)中只允许使用1次该函数。",
 		Parameters: &deepseek.FunctionParameters{
 			Type: "object",
 			Properties: map[string]interface{}{
@@ -221,14 +221,11 @@ func onSearchAPI(ctx context.Context, cfg *searchCfg, format, keyword string) (s
 	if err != nil {
 		return "", err
 	}
-	buf := &bytes.Buffer{}
-	encoder := json.NewEncoder(buf)
-	encoder.SetIndent("", "  ")
-	err = encoder.Encode(results.Items)
+	output, err := jsonEncode(results.Items)
 	if err != nil {
 		return "", err
 	}
-	return buf.String(), nil
+	return string(output), nil
 }
 
 func onBrowseURL(ctx context.Context, opts []chromedp.ExecAllocatorOption, url string) (string, error) {
