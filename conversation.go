@@ -103,11 +103,93 @@ func (bot *DeepBot) onLoadConversation(ctx *zero.Ctx) {
 }
 
 func (bot *DeepBot) onPreviewConversation(ctx *zero.Ctx) {
+	user := bot.getUser(ctx.Event.UserID)
 
+	args := textToArgN(ctx.MessageString(), 2)
+	if len(args) != 2 {
+		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+	name := args[1]
+	if name == " " || name == "" {
+		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+
+	path := fmt.Sprintf("data/conversation/%d/%s.json", user.id, name)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Println("failed to read conversation:", err)
+		return
+	}
+	var rounds []*round
+	err = json.NewDecoder(bytes.NewReader(data)).Decode(&rounds)
+	if err != nil {
+		log.Println("failed to decode conversation:", err)
+		return
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, len(data)/2))
+	for _, round := range rounds {
+		buf.WriteString("用户: ")
+		content := []rune(round.Question.Content)
+		if len(content) > 20 {
+			content = content[:20]
+		}
+		buf.WriteString(string(content))
+		buf.WriteString("\n")
+
+		buf.WriteString("模型: ")
+		content = []rune(round.Answer.Content)
+		if len(content) > 20 {
+			content = content[:20]
+		}
+		buf.WriteString(string(content))
+		buf.WriteString("\n")
+	}
+	buf.Truncate(buf.Len() - 1)
+
+	bot.sendText(ctx, buf.String())
 }
 
 func (bot *DeepBot) onCopyConversation(ctx *zero.Ctx) {
+	user := bot.getUser(ctx.Event.UserID)
 
+	args := textToArgN(ctx.MessageString(), 3)
+	if len(args) != 3 {
+		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+	uid := args[1]
+	if uid == " " || uid == "" {
+		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+	name := args[2]
+	if name == " " || name == "" {
+		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+
+	src := fmt.Sprintf("data/conversation/%s/%s.json", uid, name)
+	exists, err := isFileExists(src)
+	if err != nil {
+		log.Println("failed to check conversation:", err)
+		return
+	}
+	if !exists {
+		bot.sendText(ctx, "目标会话不存在")
+		return
+	}
+
+	dst := fmt.Sprintf("data/conversation/%d/%s.json", user.id, name)
+	err = copyFile(dst, src)
+	if err != nil {
+		log.Println("failed to copy conversation:", err)
+		return
+	}
+
+	bot.sendText(ctx, "复制会话成功")
 }
 
 func (bot *DeepBot) onDeleteConversation(ctx *zero.Ctx) {
