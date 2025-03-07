@@ -33,7 +33,7 @@ func (bot *DeepBot) onListCharacter(ctx *zero.Ctx) {
 	if list == "" {
 		list = "人设列表为空"
 	} else {
-		list = "当前人设列表: " + list
+		list = "人设列表: " + list
 	}
 
 	bot.sendText(ctx, list)
@@ -62,12 +62,12 @@ func (bot *DeepBot) onCurCharacter(ctx *zero.Ctx) {
 func (bot *DeepBot) onGetCharacter(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
-	msg := textToArgN(ctx.MessageString(), 2)
-	if len(msg) != 2 {
+	args := textToArgN(ctx.MessageString(), 2)
+	if len(args) != 2 {
 		bot.sendText(ctx, "非法参数格式")
 		return
 	}
-	name := msg[1]
+	name := args[1]
 	if name == " " || name == "" {
 		bot.sendText(ctx, "非法参数格式")
 		return
@@ -107,12 +107,12 @@ func (bot *DeepBot) onClrCharacter(ctx *zero.Ctx) {
 func (bot *DeepBot) onSetCharacter(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
-	msg := textToArgN(ctx.MessageString(), 2)
-	if len(msg) != 2 {
+	args := textToArgN(ctx.MessageString(), 2)
+	if len(args) != 2 {
 		bot.sendText(ctx, "非法参数格式")
 		return
 	}
-	name := msg[1]
+	name := args[1]
 	if name == " " || name == "" {
 		bot.sendText(ctx, "非法参数格式")
 		return
@@ -140,12 +140,12 @@ func (bot *DeepBot) onSetCharacter(ctx *zero.Ctx) {
 func (bot *DeepBot) onAddCharacter(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
-	msg := textToArgN(ctx.MessageString(), 3)
-	if len(msg) != 3 {
+	args := textToArgN(ctx.MessageString(), 3)
+	if len(args) != 3 {
 		bot.sendText(ctx, "非法参数格式")
 		return
 	}
-	name := msg[1]
+	name := args[1]
 	if name == " " || name == "" {
 		bot.sendText(ctx, "非法参数格式")
 		return
@@ -155,7 +155,7 @@ func (bot *DeepBot) onAddCharacter(ctx *zero.Ctx) {
 		return
 	}
 
-	content := msg[2]
+	content := args[2]
 	if content == " " || content == "" {
 		bot.sendText(ctx, "人设内容为空")
 		return
@@ -174,12 +174,12 @@ func (bot *DeepBot) onAddCharacter(ctx *zero.Ctx) {
 func (bot *DeepBot) onDelCharacter(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
 
-	msg := textToArgN(ctx.MessageString(), 2)
-	if len(msg) != 2 {
+	args := textToArgN(ctx.MessageString(), 2)
+	if len(args) != 2 {
 		bot.sendText(ctx, "非法参数格式")
 		return
 	}
-	name := msg[1]
+	name := args[1]
 	if name == " " || name == "" {
 		bot.sendText(ctx, "非法参数格式")
 		return
