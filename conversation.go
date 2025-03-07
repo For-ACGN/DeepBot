@@ -1,6 +1,8 @@
 package deepbot
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -58,7 +60,6 @@ func (bot *DeepBot) onSaveConversation(ctx *zero.Ctx) {
 		log.Println("failed to encode conversation:", err)
 		return
 	}
-
 	path := fmt.Sprintf("data/conversation/%d/%s.json", user.id, name)
 	err = os.WriteFile(path, output, 0600)
 	if err != nil {
@@ -70,7 +71,35 @@ func (bot *DeepBot) onSaveConversation(ctx *zero.Ctx) {
 }
 
 func (bot *DeepBot) onLoadConversation(ctx *zero.Ctx) {
+	user := bot.getUser(ctx.Event.UserID)
 
+	args := textToArgN(ctx.MessageString(), 2)
+	if len(args) != 2 {
+		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+	name := args[1]
+	if name == " " || name == "" {
+		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+
+	path := fmt.Sprintf("data/conversation/%d/%s.json", user.id, name)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Println("failed to read conversation:", err)
+		return
+	}
+	var rounds []*round
+	err = json.NewDecoder(bytes.NewReader(data)).Decode(&rounds)
+	if err != nil {
+		log.Println("failed to decode conversation:", err)
+		return
+	}
+
+	user.setRounds(rounds)
+
+	bot.sendText(ctx, "加载会话成功")
 }
 
 func (bot *DeepBot) onPreviewConversation(ctx *zero.Ctx) {
@@ -82,5 +111,35 @@ func (bot *DeepBot) onCopyConversation(ctx *zero.Ctx) {
 }
 
 func (bot *DeepBot) onDeleteConversation(ctx *zero.Ctx) {
+	user := bot.getUser(ctx.Event.UserID)
 
+	args := textToArgN(ctx.MessageString(), 2)
+	if len(args) != 2 {
+		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+	name := args[1]
+	if name == " " || name == "" {
+		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+
+	path := fmt.Sprintf("data/conversation/%d/%s.json", user.id, name)
+	exists, err := isFileExists(path)
+	if err != nil {
+		log.Println("failed to check conversation:", err)
+		return
+	}
+	if !exists {
+		bot.sendText(ctx, "会话不存在")
+		return
+	}
+
+	err = os.Remove(path)
+	if err != nil {
+		log.Println("failed to delete conversation:", err)
+		return
+	}
+
+	bot.sendText(ctx, "删除会话成功")
 }
