@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func jsonEncode(data interface{}) ([]byte, error) {
+func jsonEncode(data any) ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, 4096))
 	encoder := json.NewEncoder(buf)
 	encoder.SetIndent("", "  ")
@@ -16,6 +16,11 @@ func jsonEncode(data interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func jsonDecode(data []byte, result any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	return decoder.Decode(&result)
 }
 
 func isFileExists(path string) (bool, error) {
