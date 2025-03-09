@@ -26,6 +26,7 @@ type ChatMessage = deepseek.ChatCompletionMessage
 
 type Config struct {
 	GroupID []int64 `toml:"group_id"`
+	BlockID []int64 `toml:"block_id"`
 
 	DeepSeek struct {
 		APIKey  string `toml:"api_key"`
@@ -127,10 +128,19 @@ func NewDeepBot(config *Config) *DeepBot {
 	}
 	// register message handler
 	groupID := config.GroupID
+	blockID := config.BlockID
 	filter := func(ctx *zero.Ctx) bool {
+		// block selected user
+		for i := 0; i < len(blockID); i++ {
+			if ctx.Event.UserID == blockID[i] {
+				return false
+			}
+		}
+		// all private chat is processed
 		if ctx.Event.GroupID == 0 {
 			return true
 		}
+		// process selected group
 		for i := 0; i < len(groupID); i++ {
 			if ctx.Event.GroupID == groupID[i] {
 				return true
@@ -144,6 +154,8 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("aix ", filter).SetBlock(true).Handle(bot.onReasonerX)
 	zero.OnCommand("coder ", filter).SetBlock(true).Handle(bot.onCoder)
 	zero.OnCommand("coderx ", filter).SetBlock(true).Handle(bot.onCoderX)
+	zero.OnCommand("pic ", filter).SetBlock(true).Handle(bot.onDrawImage)
+	zero.OnCommand("picx ", filter).SetBlock(true).Handle(bot.onDrawImage)
 	zero.OnCommand("deep.当前模型", filter).SetBlock(true).Handle(bot.onGetModel)
 	zero.OnCommand("deep.设置模型 ", filter).SetBlock(true).Handle(bot.onSetModel)
 	zero.OnCommand("deep.启用函数", filter).SetBlock(true).Handle(bot.onEnableToolCall)
@@ -168,7 +180,6 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("deep.删除人设 ", filter).SetBlock(true).Handle(bot.onDelCharacter)
 	zero.OnCommand("deep.读取心情", filter).SetBlock(true).Handle(bot.onGetMood)
 	zero.OnCommand("deep.当前心情", filter).SetBlock(true).Handle(bot.onUpdateMood)
-	zero.OnCommand("help", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnCommand("deep.help", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnCommand("deep.帮助文档", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnCommand("deep.帮助信息", filter).SetBlock(true).Handle(bot.onHelp)
