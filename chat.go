@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand/v2"
+	"os"
 	"strings"
 	"time"
 
@@ -70,7 +71,7 @@ func (bot *DeepBot) onChatX(ctx *zero.Ctx) {
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("failed to chat: %s\n", err)
+		log.Printf("failed to chatx: %s\n", err)
 		return
 	}
 
@@ -89,7 +90,7 @@ func (bot *DeepBot) onReasoner(ctx *zero.Ctx) {
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("failed to chat: %s\n", err)
+		log.Printf("failed to reasoner: %s\n", err)
 		return
 	}
 
@@ -108,7 +109,7 @@ func (bot *DeepBot) onReasonerX(ctx *zero.Ctx) {
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("failed to chat: %s\n", err)
+		log.Printf("failed to reasonerx: %s\n", err)
 		return
 	}
 
@@ -151,7 +152,7 @@ func (bot *DeepBot) onCoder(ctx *zero.Ctx) {
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("failed to chat: %s\n", err)
+		log.Printf("failed to coder: %s\n", err)
 		return
 	}
 
@@ -173,7 +174,7 @@ func (bot *DeepBot) onCoderX(ctx *zero.Ctx) {
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("failed to chat: %s\n", err)
+		log.Printf("failed to coderx: %s\n", err)
 		return
 	}
 
@@ -181,10 +182,7 @@ func (bot *DeepBot) onCoderX(ctx *zero.Ctx) {
 }
 
 func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
-	if !ctx.Event.IsToMe {
-		return
-	}
-	if ctx.Event.GroupID != 0 {
+	if !ctx.Event.IsToMe || ctx.Event.GroupID != 0 {
 		return
 	}
 
@@ -208,7 +206,7 @@ func (bot *DeepBot) onMessage(ctx *zero.Ctx) {
 	}
 	resp, err := bot.chat(req, user, msg)
 	if err != nil {
-		log.Printf("failed to chat: %s\n", err)
+		log.Printf("failed to on message: %s\n", err)
 		return
 	}
 
@@ -302,6 +300,7 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (*chatResp, e
 		var resp *chatResp
 		resp, err = bot.tryChat(req, user, msg)
 		if err == nil {
+			bot.saveCurrentConversation(user)
 			return resp, nil
 		}
 		var retry bool
@@ -323,6 +322,21 @@ func (bot *DeepBot) chat(req *ChatRequest, user *user, msg string) (*chatResp, e
 		break
 	}
 	return nil, err
+}
+
+func (bot *DeepBot) saveCurrentConversation(user *user) {
+	rounds := user.getRounds()
+	output, err := jsonEncode(&rounds)
+	if err != nil {
+		log.Println("failed to encode current conversation:", err)
+		return
+	}
+	path := fmt.Sprintf("data/conversation/%d/current.json", user.id)
+	err = os.WriteFile(path, output, 0600)
+	if err != nil {
+		log.Println("failed to save current conversation:", err)
+		return
+	}
 }
 
 func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp, error) {
@@ -382,6 +396,7 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 	if content == "" {
 		return nil, errors.New("receive empty message content")
 	}
+	reasoning := cm.ReasoningContent
 	answer := ChatMessage{
 		Role:    deepseek.ChatMessageRoleAssistant,
 		Content: content,
@@ -391,13 +406,23 @@ func (bot *DeepBot) tryChat(req *ChatRequest, user *user, msg string) (*chatResp
 		Answer:   answer,
 	})
 	user.setRounds(rounds)
-	cr := &chatResp{
-		Answer:    content,
-		Reasoning: cm.ReasoningContent,
-	}
+
 	fmt.Println("==================chat response=================")
 	fmt.Println(content)
+	if reasoning != "" {
+		fmt.Println("----------------reasoning content----------------")
+		fmt.Println(reasoning)
+	}
+	fmt.Println("------------------------------------------------")
+	usage := resp.Usage
+	fmt.Println("prompt token:", usage.PromptTokens, "completion token:", usage.CompletionTokens)
+	fmt.Println("cache hit:", usage.PromptCacheHitTokens, "cache miss:", usage.PromptCacheMissTokens)
 	fmt.Println("================================================")
+
+	cr := &chatResp{
+		Answer:    content,
+		Reasoning: reasoning,
+	}
 	return cr, nil
 }
 
