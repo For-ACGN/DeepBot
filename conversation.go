@@ -23,6 +23,9 @@ func (bot *DeepBot) onListConversation(ctx *zero.Ctx) {
 	var list string
 	for _, file := range dir {
 		name := file.Name()
+		if name == "current.json" {
+			continue
+		}
 		list += strings.ReplaceAll(name, ".json", "") + " "
 	}
 
@@ -46,6 +49,10 @@ func (bot *DeepBot) onSaveConversation(ctx *zero.Ctx) {
 	name := args[1]
 	if name == " " || name == "" {
 		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+	if name == "current" {
+		bot.sendText(ctx, "不可使用保留会话名")
 		return
 	}
 
@@ -83,6 +90,10 @@ func (bot *DeepBot) onLoadConversation(ctx *zero.Ctx) {
 		bot.sendText(ctx, "非法参数格式")
 		return
 	}
+	if name == "current" {
+		bot.sendText(ctx, "不可使用保留会话名")
+		return
+	}
 
 	path := fmt.Sprintf("data/conversation/%d/%s.json", user.id, name)
 	data, err := os.ReadFile(path)
@@ -113,6 +124,10 @@ func (bot *DeepBot) onPreviewConversation(ctx *zero.Ctx) {
 	name := args[1]
 	if name == " " || name == "" {
 		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+	if name == "current" {
+		bot.sendText(ctx, "不可使用保留会话名")
 		return
 	}
 
@@ -170,6 +185,10 @@ func (bot *DeepBot) onCopyConversation(ctx *zero.Ctx) {
 		bot.sendText(ctx, "非法参数格式")
 		return
 	}
+	if name == "current" {
+		bot.sendText(ctx, "不可使用保留会话名")
+		return
+	}
 
 	src := fmt.Sprintf("data/conversation/%s/%s.json", uid, name)
 	exists, err := isFileExists(src)
@@ -203,6 +222,10 @@ func (bot *DeepBot) onDeleteConversation(ctx *zero.Ctx) {
 	name := args[1]
 	if name == " " || name == "" {
 		bot.sendText(ctx, "非法参数格式")
+		return
+	}
+	if name == "current" {
+		bot.sendText(ctx, "不可使用保留会话名")
 		return
 	}
 
