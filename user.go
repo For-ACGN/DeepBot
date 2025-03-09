@@ -38,7 +38,7 @@ type user struct {
 	mood string
 
 	// store data for tool call
-	ctx map[string]interface{}
+	ctx map[string]any
 
 	rwm sync.RWMutex
 }
@@ -48,7 +48,7 @@ func newUser(id int64) *user {
 		id:    id,
 		last:  time.Now(),
 		model: deepseek.DeepSeekChat,
-		ctx:   make(map[string]interface{}),
+		ctx:   make(map[string]any),
 	}
 	err := user.initDir()
 	if err != nil {
@@ -94,6 +94,14 @@ func (user *user) readCharacter() {
 
 func (user *user) readConversation() {
 	path := fmt.Sprintf("data/conversation/%d/current.json", user.id)
+	stat, err := os.Stat(path)
+	if err != nil {
+		return
+	}
+	// skip old conversation
+	if time.Since(stat.ModTime()) > conversationTimeout {
+		return
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return
@@ -129,7 +137,7 @@ func (user *user) setCharacter(role, content string) {
 func (user *user) getRounds() []*round {
 	user.rwm.Lock()
 	defer user.rwm.Unlock()
-	if time.Since(user.last) > 30*time.Minute {
+	if time.Since(user.last) > conversationTimeout {
 		user.rounds = nil
 	}
 	user.last = time.Now()
@@ -179,13 +187,13 @@ func (user *user) setMood(mood string) {
 	user.mood = mood
 }
 
-func (user *user) getContext(key string) interface{} {
+func (user *user) getContext(key string) any {
 	user.rwm.RLock()
 	defer user.rwm.RUnlock()
 	return user.ctx[key]
 }
 
-func (user *user) setContext(key string, data interface{}) {
+func (user *user) setContext(key string, data any) {
 	user.rwm.Lock()
 	defer user.rwm.Unlock()
 	user.ctx[key] = data
