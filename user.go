@@ -11,8 +11,8 @@ import (
 )
 
 type round struct {
-	Question ChatMessage
-	Answer   ChatMessage
+	Question ChatMessage `json:"question"`
+	Answer   ChatMessage `json:"answer"`
 }
 
 type user struct {
@@ -55,36 +55,56 @@ func newUser(id int64) *user {
 		log.Println("[warning] failed to initialize user data directory:", err)
 	}
 	user.readCharacter()
+	user.readConversation()
 	return user
 }
 
 func (user *user) initDir() error {
-	err := os.MkdirAll(fmt.Sprintf("data/characters/%d", user.id), 0755)
-	if err != nil {
-		return err
-	}
-	err = os.MkdirAll(fmt.Sprintf("data/memory/private/%d", user.id), 0755)
-	if err != nil {
-		return err
+	for _, path := range []string{
+		fmt.Sprintf("data/characters/%d", user.id),
+		fmt.Sprintf("data/conversation/%d", user.id),
+		fmt.Sprintf("data/memory/private/%d", user.id),
+	} {
+		err := os.MkdirAll(path, 0755)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (user *user) readCharacter() {
-	role, err := os.ReadFile(fmt.Sprintf("data/characters/%d/current.cfg", user.id))
+	path := fmt.Sprintf("data/characters/%d/current.cfg", user.id)
+	role, err := os.ReadFile(path)
 	if err != nil {
 		return
 	}
 	if len(role) == 0 {
 		return
 	}
-	char, err := os.ReadFile(fmt.Sprintf("data/characters/%d/%s.txt", user.id, role))
+	path = fmt.Sprintf("data/characters/%d/%s.txt", user.id, role)
+	char, err := os.ReadFile(path)
 	if err != nil {
 		log.Println("[error] failed to read character file:", err)
 		return
 	}
 	user.role = string(role)
 	user.character = string(char)
+}
+
+func (user *user) readConversation() {
+	path := fmt.Sprintf("data/conversation/%d/current.json", user.id)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var rounds []*round
+	err = jsonDecode(data, &rounds)
+	if err != nil {
+		log.Println("failed to decode current conversation:", err)
+		return
+	}
+	user.rounds = rounds
 }
 
 func (user *user) getRole() string {
