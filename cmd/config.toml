@@ -32,6 +32,11 @@ block_id = [666, 667] # user id
   enabled = true
   rate    = 10 # 0-100%
 
+[sd_webui]
+  enabled = true
+  url     = "http://127.0.0.1:7860/"
+  timeout = 120000 # millisecond
+
 [memory]
   enabled = true
 
