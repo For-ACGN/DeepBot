@@ -14,6 +14,8 @@
 | aix       | 与ai命令类似，但是输出时携带思考过程         |
 | coder     | 使用deepseek-chat模型，预设适合编程的参数 |
 | coderx    | 与coder命令类似，但是启用外部函数         |
+| pic       | 使用SD-WebUI API绘制图片          |
+| picx      | 与pic命令类似，但是附带额外的参数          |
 | deep.当前模型 | 查看当前设置的模型                   |
 | deep.设置模型 | 设置当前模型，可选(r1、chat)          |
 | deep.启用函数 | 全局启用所有的外部函数调用(默认启用)         |
@@ -38,6 +40,8 @@
 
 ### 使用示例
   * ```chat 你好DeepSeek``` 指定deepseek-chat模型会话
+  * ```pic girl, blue``` 使用提示词girl, blue绘制图片
+  * ```pic 1024x1536 30 girl, blue``` 附带分辨率和steps绘制图片
   * ```deep.设置模型 r1``` 设置当前模型为deepseek-r1
   * ```deep.保存会话 会话A``` 保存当前会话，命名为会话A
   * ```deep.复制会话 123456 会话A``` 复制用户123456的会话A
