@@ -65,6 +65,12 @@ type Config struct {
 		Rate    int  `toml:"rate"`
 	} `toml:"emoticon"`
 
+	SDWebUI struct {
+		Enabled bool   `toml:"enabled"`
+		URL     string `toml:"url"`
+		Timeout int    `toml:"timeout"`
+	} `toml:"sd_webui"`
+
 	Memory struct {
 		Enabled bool `toml:"enabled"`
 	} `toml:"memory"`
@@ -155,7 +161,7 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("coder ", filter).SetBlock(true).Handle(bot.onCoder)
 	zero.OnCommand("coderx ", filter).SetBlock(true).Handle(bot.onCoderX)
 	zero.OnCommand("pic ", filter).SetBlock(true).Handle(bot.onDrawImage)
-	zero.OnCommand("picx ", filter).SetBlock(true).Handle(bot.onDrawImage)
+	zero.OnCommand("picx ", filter).SetBlock(true).Handle(bot.onDrawImageWithArgs)
 	zero.OnCommand("deep.当前模型", filter).SetBlock(true).Handle(bot.onGetModel)
 	zero.OnCommand("deep.设置模型 ", filter).SetBlock(true).Handle(bot.onSetModel)
 	zero.OnCommand("deep.启用函数", filter).SetBlock(true).Handle(bot.onEnableToolCall)
