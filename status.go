@@ -150,12 +150,18 @@ func (bot *DeepBot) trySeek(req *ChatRequest, user *user, msg string) (*chatResp
 	if content == "" {
 		return nil, errors.New("receive empty message content")
 	}
+
+	fmt.Println("==================seek response=================")
+	fmt.Println(content)
+	fmt.Println("------------------------------------------------")
+	usage := resp.Usage
+	fmt.Println("prompt token:", usage.PromptTokens, "completion token:", usage.CompletionTokens)
+	fmt.Println("cache hit:", usage.PromptCacheHitTokens, "cache miss:", usage.PromptCacheMissTokens)
+	fmt.Println("================================================")
+
 	cr := &chatResp{
 		Answer:    content,
 		Reasoning: cm.ReasoningContent,
 	}
-	fmt.Println("==================seek response=================")
-	fmt.Println(content)
-	fmt.Println("================================================")
 	return cr, nil
 }
