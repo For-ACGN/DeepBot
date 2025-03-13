@@ -248,6 +248,7 @@ func (bot *DeepBot) onSetModel(ctx *zero.Ctx) {
 
 func (bot *DeepBot) onEnableToolCall(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
+
 	user.setToolCall(true)
 
 	bot.sendText(ctx, "全局启用函数")
@@ -255,6 +256,7 @@ func (bot *DeepBot) onEnableToolCall(ctx *zero.Ctx) {
 
 func (bot *DeepBot) onDisableToolCall(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
+
 	user.setToolCall(false)
 
 	bot.sendText(ctx, "全局禁用函数")
@@ -262,7 +264,9 @@ func (bot *DeepBot) onDisableToolCall(ctx *zero.Ctx) {
 
 func (bot *DeepBot) onReset(ctx *zero.Ctx) {
 	user := bot.getUser(ctx.Event.UserID)
+
 	user.setRounds(nil)
+	_ = os.Remove(fmt.Sprintf("data/conversation/%d/current.json", user.id))
 
 	bot.sendText(ctx, "重置会话成功")
 }

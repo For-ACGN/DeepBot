@@ -2,7 +2,6 @@ package deepbot
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -102,7 +101,7 @@ func (bot *DeepBot) onLoadConversation(ctx *zero.Ctx) {
 		return
 	}
 	var rounds []*round
-	err = json.NewDecoder(bytes.NewReader(data)).Decode(&rounds)
+	err = jsonDecode(data, &rounds)
 	if err != nil {
 		log.Println("failed to decode conversation:", err)
 		return
@@ -138,7 +137,7 @@ func (bot *DeepBot) onPreviewConversation(ctx *zero.Ctx) {
 		return
 	}
 	var rounds []*round
-	err = json.NewDecoder(bytes.NewReader(data)).Decode(&rounds)
+	err = jsonDecode(data, &rounds)
 	if err != nil {
 		log.Println("failed to decode conversation:", err)
 		return

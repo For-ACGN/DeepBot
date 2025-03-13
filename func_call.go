@@ -3,7 +3,6 @@ package deepbot
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -65,7 +64,7 @@ var toolSearchWeb = deepseek.Tool{
 			"输入关键字提交给搜索引擎，返回json格式的搜索结果。",
 		Parameters: &deepseek.FunctionParameters{
 			Type: "object",
-			Properties: map[string]interface{}{
+			Properties: map[string]any{
 				"keyword": &toolArgument{
 					Type:        "string",
 					Description: "需要查询的关键字",
@@ -85,7 +84,7 @@ var toolSearchImage = deepseek.Tool{
 			"输入关键字提交给搜索引擎，返回json格式的搜索结果。",
 		Parameters: &deepseek.FunctionParameters{
 			Type: "object",
-			Properties: map[string]interface{}{
+			Properties: map[string]any{
 				"keyword": &toolArgument{
 					Type:        "string",
 					Description: "需要查询的关键字",
@@ -116,7 +115,7 @@ var toolBrowseURL = deepseek.Tool{
 			"禁止多次来回调用该工具函数，一轮会话(tool calls)中只允许使用1次该函数。",
 		Parameters: &deepseek.FunctionParameters{
 			Type: "object",
-			Properties: map[string]interface{}{
+			Properties: map[string]any{
 				"url": &toolArgument{
 					Type:        "string",
 					Description: "目标URL",
@@ -139,7 +138,7 @@ var toolEvalGo = deepseek.Tool{
 			"否则正常返回程序的输出，即使这个程序(输入的源码)运行时产生了错误。",
 		Parameters: &deepseek.FunctionParameters{
 			Type: "object",
-			Properties: map[string]interface{}{
+			Properties: map[string]any{
 				"src": &toolArgument{
 					Type:        "string",
 					Description: "传入的Go语言源码",
@@ -215,9 +214,8 @@ func onSearchAPI(ctx context.Context, cfg *searchCfg, format, keyword string) (s
 			Snippet string `json:"snippet"`
 		} `json:"items"`
 	}
-	results := result{}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	err = decoder.Decode(&results)
+	var results result
+	err = jsonDecode(data, &results)
 	if err != nil {
 		return "", err
 	}
@@ -338,7 +336,7 @@ var toolGetTemperature = deepseek.Tool{
 		Description: "获取当前地区/城市的温度。",
 		Parameters: &deepseek.FunctionParameters{
 			Type: "object",
-			Properties: map[string]interface{}{
+			Properties: map[string]any{
 				"location": &toolArgument{
 					Type:        "string",
 					Description: "地区/城市的名称",
@@ -356,7 +354,7 @@ var toolGetRelativeHumidity = deepseek.Tool{
 		Description: "获取当前地区/城市的相对湿度。",
 		Parameters: &deepseek.FunctionParameters{
 			Type: "object",
-			Properties: map[string]interface{}{
+			Properties: map[string]any{
 				"location": &toolArgument{
 					Type:        "string",
 					Description: "地区/城市的名称",
