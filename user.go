@@ -10,6 +10,8 @@ import (
 	"github.com/cohesion-org/deepseek-go"
 )
 
+const conversationTimeout = 30 * time.Minute
+
 type round struct {
 	Question ChatMessage `json:"question"`
 	Answer   ChatMessage `json:"answer"`
@@ -18,11 +20,10 @@ type round struct {
 type user struct {
 	id int64
 
-	// current role name
-	role string
-
-	// current character content
-	character string
+	// role config
+	role      string // current role name
+	character string // current character content
+	prompt    string // prompt template
 
 	// chat context content
 	rounds []*round
@@ -88,8 +89,12 @@ func (user *user) readCharacter() {
 		log.Println("[error] failed to read character file:", err)
 		return
 	}
+	path = fmt.Sprintf("data/characters/%d/%s.tpl", user.id, role)
+	prompt, _ := os.ReadFile(path)
+
 	user.role = string(role)
 	user.character = string(char)
+	user.prompt = string(prompt)
 }
 
 func (user *user) readConversation() {
@@ -127,11 +132,18 @@ func (user *user) getCharacter() string {
 	return user.character
 }
 
-func (user *user) setCharacter(role, content string) {
+func (user *user) getPrompt() string {
+	user.rwm.RLock()
+	defer user.rwm.RUnlock()
+	return user.prompt
+}
+
+func (user *user) setCharacter(role, content, prompt string) {
 	user.rwm.Lock()
 	defer user.rwm.Unlock()
 	user.role = role
 	user.character = content
+	user.prompt = prompt
 }
 
 func (user *user) getRounds() []*round {
