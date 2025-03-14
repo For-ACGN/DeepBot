@@ -37,6 +37,7 @@
 | deep.删除人设 | 删除一个人设: (角色A)               |
 | deep.读取心情 | 读取当前的心情                     |
 | deep.当前心情 | 更新当前的心情                     |
+| deep.总结群聊 | 总结群内最近500条聊天记录(实验性)         |
 | deep.帮助文档 | 查看帮助文档 可用(help)代替           |
 
 ### 使用示例
@@ -60,7 +61,7 @@
   * 优先使用chat模型，因为r1模型的回复速度比chat慢得多
   * 保存、加载、复制会话会忽略人设
   * 添加人设时如果当前人设名已存在则覆盖原始内容
-  * 可以在角色prompt模板中添加"{{.mood}}"来配合心情系统
+  * 可以在角色prompt模板中添加{{.mood}}来配合心情系统
   * 添加人设之后需要使用选择人设命令来生效
   * 添加角色prompt模板之后需要使用选择人设命令来生效
   * 删除人设会同时删除相关的角色prompt模板
@@ -69,3 +70,10 @@
 <div style="text-align: right;">
 repo: https://github.com/For-ACGN/DeepBot
 </div>
+
+<style>
+  table {
+    margin-left:  auto;
+    margin-right: auto;
+  }
+</style>
