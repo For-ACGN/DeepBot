@@ -30,7 +30,7 @@ func newMDDetector() *mdDetector {
 		// 列表项: */-/数字. 后跟空格
 		{"list", regexp.MustCompile(`(?m)^(\*|-|\d+\.)\s+`), 1.0},
 		// 链接/图片
-		{"link", regexp.MustCompile(`\[.*?\]\(.+?\)`), 2.0},
+		{"link", regexp.MustCompile(`\[.*?]\(.+?\)`), 2.0},
 		// 粗体/斜体
 		{"emphasis", regexp.MustCompile(`(\*\*.*?\*\*|\*.*?\*)`), 1.0},
 		// 引用块
