@@ -1,11 +1,8 @@
 package deepbot
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/cohesion-org/deepseek-go"
@@ -29,14 +26,14 @@ type msgType struct {
 	Message []struct {
 		Type string `json:"type"`
 		Data struct {
-			Text    string      `json:"text,omitempty"`
-			Name    string      `json:"name,omitempty"`
-			QQ      string      `json:"qq"`
-			ID      string      `json:"id"`
-			File    string      `json:"file,omitempty"`
-			Summary string      `json:"summary,omitempty"`
-			Data    string      `json:"data,omitempty"`
-			Content interface{} `json:"content,omitempty"`
+			Text    string `json:"text,omitempty"`
+			Name    string `json:"name,omitempty"`
+			QQ      string `json:"qq"`
+			ID      string `json:"id"`
+			File    string `json:"file,omitempty"`
+			Summary string `json:"summary,omitempty"`
+			Data    string `json:"data,omitempty"`
+			Content any    `json:"content,omitempty"`
 		} `json:"data"`
 	} `json:"message"`
 	MessageID       uint64 `json:"message_id"`
@@ -61,9 +58,9 @@ type msgItem struct {
 
 func (bot *DeepBot) buildSTM(ctx *zero.Ctx) {
 	params := make(zero.Params)
-	params["group_id"] = bot.config.GroupID[0]
+	params["group_id"] = ctx.Event.GroupID
 	params["message_seq"] = 0
-	params["count"] = 550
+	params["count"] = 500
 
 	resp := ctx.CallAction("get_group_msg_history", params)
 	if resp.Status != "ok" {
@@ -72,13 +69,13 @@ func (bot *DeepBot) buildSTM(ctx *zero.Ctx) {
 
 	var messages []*msgType
 	raw := resp.Data.Get("messages").Raw
-	err := json.NewDecoder(strings.NewReader(raw)).Decode(&messages)
+	err := jsonDecode([]byte(raw), &messages)
 	if err != nil {
 		log.Println("failed to read group history message:", err)
 		return
 	}
 
-	messages = messages[:400]
+	// messages = messages[800:1100]
 
 	var items []*msgItem
 	for _, msg := range messages {
@@ -112,16 +109,15 @@ func (bot *DeepBot) buildSTM(ctx *zero.Ctx) {
 		items = append(items, item)
 	}
 
-	buf := bytes.NewBuffer(make([]byte, 0, len(items)*64))
-	encoder := json.NewEncoder(buf)
-	encoder.SetIndent("", "  ")
-	err = encoder.Encode(items)
+	output, err := jsonEncode(items)
 	if err != nil {
 		log.Println("failed to encode history message:", err)
 		return
 	}
 
-	fmt.Println(buf)
+	fmt.Println(string(output))
+
+	// return
 
 	// 	prompt := `
 	// 以下是你加入的一个群聊中最近的消息(JSON格式)，你是一名活跃的群员，
@@ -205,7 +201,7 @@ content中有三类消息:
 ========================历史对话内容=======================
 `
 
-	prompt += buf.String()
+	prompt += string(output)
 
 	fmt.Println(len(prompt))
 
@@ -225,7 +221,7 @@ content中有三类消息:
 	}
 	fmt.Println(response.Answer)
 
-	ctx.SendGroupMessage(bot.config.GroupID[0], message.Text(response.Answer))
+	ctx.Send(message.Text(response.Answer))
 
 	// for _, msg := range messages {
 	// 	fmt.Println()
