@@ -187,6 +187,7 @@ func NewDeepBot(config *Config) *DeepBot {
 	zero.OnCommand("deep.删除人设 ", filter).SetBlock(true).Handle(bot.onDelCharacter)
 	zero.OnCommand("deep.读取心情", filter).SetBlock(true).Handle(bot.onGetMood)
 	zero.OnCommand("deep.当前心情", filter).SetBlock(true).Handle(bot.onUpdateMood)
+	zero.OnCommand("deep.总结群聊", filter).SetBlock(true).Handle(bot.onSummarizeGroupMsg)
 	zero.OnCommand("deep.help", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnCommand("deep.帮助文档", filter).SetBlock(true).Handle(bot.onHelp)
 	zero.OnCommand("deep.帮助信息", filter).SetBlock(true).Handle(bot.onHelp)
@@ -253,6 +254,10 @@ func (bot *DeepBot) getChromedpOptions() []chromedp.ExecAllocatorOption {
 
 func (bot *DeepBot) onConnect(ctx *zero.Ctx) {
 	// bot.buildSTM(ctx)
+}
+
+func (bot *DeepBot) onSummarizeGroupMsg(ctx *zero.Ctx) {
+	bot.buildSTM(ctx)
 }
 
 func (bot *DeepBot) onNotice(ctx *zero.Ctx) {
