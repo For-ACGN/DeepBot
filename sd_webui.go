@@ -52,15 +52,7 @@ func (bot *DeepBot) onDrawImage(ctx *zero.Ctx) {
 		return
 	}
 
-	switch rand.IntN(3) {
-	case 0:
-		sendText(ctx, "正在画图", false)
-	case 1:
-		sendText(ctx, "正在画图ing", false)
-	default:
-		sendText(ctx, "等待画图中", false)
-	}
-
+	bot.sendRandomWait(ctx)
 	img, err := bot.drawImage(prompt, 30, 1024, 1024)
 	if err != nil {
 		log.Println("failed to draw image:", err)
@@ -97,21 +89,24 @@ func (bot *DeepBot) onDrawImageWithArgs(ctx *zero.Ctx) {
 		return
 	}
 
-	switch rand.IntN(3) {
-	case 0:
-		sendText(ctx, "正在画图", false)
-	case 1:
-		sendText(ctx, "正在画图ing", false)
-	default:
-		sendText(ctx, "等待画图中", false)
-	}
-
+	bot.sendRandomWait(ctx)
 	img, err := bot.drawImage(prompt, steps, width, height)
 	if err != nil {
 		log.Println("failed to draw image:", err)
 		return
 	}
 	sendImage(ctx, img)
+}
+
+func (bot *DeepBot) sendRandomWait(ctx *zero.Ctx) {
+	switch rand.IntN(3) {
+	case 0:
+		bot.sendText(ctx, "正在画图")
+	case 1:
+		bot.sendText(ctx, "正在画图ing")
+	default:
+		bot.sendText(ctx, "等待画图中")
+	}
 }
 
 func (bot *DeepBot) drawImage(prompt string, steps, width, height int) ([]byte, error) {
@@ -181,7 +176,15 @@ func (bot *DeepBot) drawImage(prompt string, steps, width, height int) ([]byte, 
 }
 
 func parseResolution(s string) (int, int, bool) {
-	res := strings.Split(s, "x")
+	var res []string
+	switch {
+	case strings.Contains(s, "x"):
+		res = strings.Split(s, "x")
+	case strings.Contains(s, "*"):
+		res = strings.Split(s, "*")
+	default:
+		return 0, 0, false
+	}
 	if len(res) != 2 {
 		return 0, 0, false
 	}
