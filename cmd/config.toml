@@ -36,6 +36,7 @@ block_id = [666, 667] # user id
   enabled = true
   url     = "http://127.0.0.1:7860/"
   timeout = 120000 # millisecond
+  config  = "sd_webui.json" # config file path for API request
 
 [memory]
   enabled = true
