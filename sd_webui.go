@@ -3,11 +3,13 @@ package deepbot
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"log"
 	"math/rand/v2"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +35,8 @@ type txt2Image struct {
 
 	SendImages bool `json:"send_images"`
 	SaveImages bool `json:"save_images"`
+
+	Seed int64 `json:"seed"`
 }
 
 func (bot *DeepBot) onDrawImage(ctx *zero.Ctx) {
@@ -124,21 +128,35 @@ func (bot *DeepBot) drawImage(prompt string, steps, width, height int) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	arg := txt2Image{
-		Prompt:      prompt,
-		NegPrompt:   "",
-		SamplerName: "Euler a",
-		Scheduler:   "Normal",
-		Steps:       steps,
-		Width:       width,
-		Height:      height,
-		BatchSize:   1,
-		BatchCount:  1,
-		DisCFGScale: 3.5,
-		CFGScale:    7,
-		SendImages:  true,
-		SaveImages:  true,
+	var arg txt2Image
+	if cfg.Config != "" {
+		data, err := os.ReadFile(cfg.Config)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(data, &arg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		arg = txt2Image{
+			NegPrompt:   "",
+			SamplerName: "Euler a",
+			Scheduler:   "Normal",
+			BatchSize:   1,
+			BatchCount:  1,
+			DisCFGScale: 3.5,
+			CFGScale:    7,
+		}
 	}
+	arg.Prompt = prompt
+	arg.Steps = steps
+	arg.Width = width
+	arg.Height = height
+	arg.SendImages = true
+	arg.SaveImages = true
+	arg.Seed = -1
+
 	data, err := jsonEncode(arg)
 	if err != nil {
 		return nil, err
