@@ -69,6 +69,7 @@ type Config struct {
 		Enabled bool   `toml:"enabled"`
 		URL     string `toml:"url"`
 		Timeout int    `toml:"timeout"`
+		Config  string `toml:"config"`
 	} `toml:"sd_webui"`
 
 	Memory struct {
