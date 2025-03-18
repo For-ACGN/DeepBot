@@ -455,7 +455,7 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 			answer = answer[:maxToolCallLen]
 		}
 		answers = append(answers, ChatMessage{
-			Role:       "tool",
+			Role:       deepseek.ChatMessageRoleTool,
 			Content:    answer,
 			ToolCallID: toolCall.ID,
 		})
@@ -471,7 +471,7 @@ func (bot *DeepBot) doToolCalls(req *ChatRequest, resp *ChatResponse, user *user
 		Temperature: req.Temperature,
 		TopP:        req.TopP,
 		MaxTokens:   8192,
-		// Tools:       updateTools(user, req.Tools),
+		Tools:       updateTools(user, req.Tools),
 	}
 	resp, err := bot.client.CreateChatCompletion(context.Background(), toolReq)
 	if err != nil {

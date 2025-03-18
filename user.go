@@ -32,8 +32,8 @@ type user struct {
 	// current model name
 	model string
 
-	// global disable tool call
-	disableTC bool
+	// global tool call
+	enableTC bool
 
 	// about character mood
 	mood string
@@ -178,13 +178,13 @@ func (user *user) setModel(model string) {
 func (user *user) canToolCall() bool {
 	user.rwm.RLock()
 	defer user.rwm.RUnlock()
-	return !user.disableTC
+	return user.enableTC
 }
 
 func (user *user) setToolCall(enabled bool) {
 	user.rwm.Lock()
 	defer user.rwm.Unlock()
-	user.disableTC = !enabled
+	user.enableTC = enabled
 }
 
 func (user *user) getMood() string {
